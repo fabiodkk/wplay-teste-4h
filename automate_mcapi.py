@@ -136,21 +136,25 @@ def connect_db(db_password: str, project_ref: str, project_region: str = ""):
         if not project_region:
             raise direct_exc
 
-        pooler_host = f"aws-0-{project_region}.pooler.supabase.com"
+        pooler_hosts = [
+            f"aws-1-{project_region}.pooler.supabase.com",
+            f"aws-0-{project_region}.pooler.supabase.com",
+        ]
         last_exc = direct_exc
-        for pooler_port in (6543, 5432):
-            pooler_kwargs = {
-                "host": pooler_host,
-                "port": pooler_port,
-                "dbname": "postgres",
-                "user": f"postgres.{project_ref}",
-                "password": db_password,
-                "sslmode": "require",
-            }
-            try:
-                return connect_with_ipv4_fallback(pooler_kwargs)
-            except psycopg2.OperationalError as pooler_exc:
-                last_exc = pooler_exc
+        for pooler_host in pooler_hosts:
+            for pooler_port in (6543, 5432):
+                pooler_kwargs = {
+                    "host": pooler_host,
+                    "port": pooler_port,
+                    "dbname": "postgres",
+                    "user": f"postgres.{project_ref}",
+                    "password": db_password,
+                    "sslmode": "require",
+                }
+                try:
+                    return connect_with_ipv4_fallback(pooler_kwargs)
+                except psycopg2.OperationalError as pooler_exc:
+                    last_exc = pooler_exc
 
         raise last_exc
 
