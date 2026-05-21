@@ -15,6 +15,24 @@ from automate_mcapi import (
 app = Flask(__name__)
 
 
+def default_limit_info(reason=""):
+    return {
+        "allowed": True,
+        "is_liberado": False,
+        "first_seeded": False,
+        "day_count": 0,
+        "week_count": 0,
+        "reason": reason,
+    }
+
+
+def safe_check_ip_limits(client_ip: str):
+    try:
+        return check_ip_limits(client_ip)
+    except Exception:
+        return default_limit_info("Controle temporariamente indisponivel.")
+
+
 def to_brasilia(iso_date: str) -> str:
     if not iso_date:
         return ""
@@ -47,7 +65,7 @@ def render_liberados(status_msg="", is_error=False):
 @app.get("/")
 def index():
     client_ip = get_client_ip(request)
-    limit_info = check_ip_limits(client_ip)
+    limit_info = safe_check_ip_limits(client_ip)
     return render_template(
         "index.html",
         result=None,
@@ -73,7 +91,7 @@ def gerar():
             result={"ok": False},
             basic=None,
             client_ip=client_ip,
-            limit_info=check_ip_limits(client_ip),
+            limit_info=safe_check_ip_limits(client_ip),
             error_msg="Para liberar seu teste, informe um WhatsApp valido.",
             info_msg="",
             form_phone=telefone,
@@ -99,14 +117,14 @@ def gerar():
             result={"ok": True, "reused": True, "test_response": active_access},
             basic=basic,
             client_ip=client_ip,
-            limit_info=check_ip_limits(client_ip),
+            limit_info=safe_check_ip_limits(client_ip),
             error_msg="",
             info_msg="Seu teste atual ainda esta ativo. Reapresentamos o mesmo acesso para voce continuar.",
             form_phone=telefone,
             form_telegram_id=telegram_id,
         )
 
-    limit_info = check_ip_limits(client_ip)
+    limit_info = safe_check_ip_limits(client_ip)
 
     if not limit_info.get("allowed"):
         return render_template(
@@ -136,7 +154,7 @@ def gerar():
     else:
         error_msg = "Nao conseguimos liberar agora. Tente novamente em instantes ou fale com nosso time no WhatsApp."
 
-    limit_info = check_ip_limits(client_ip)
+    limit_info = safe_check_ip_limits(client_ip)
     return render_template(
         "index.html",
         result=result,
@@ -148,6 +166,11 @@ def gerar():
         form_phone=telefone,
         form_telegram_id=telegram_id,
     )
+
+
+@app.get("/healthz")
+def healthz():
+    return {"ok": True, "service": "wplay-teste-4h"}, 200
 
 
 @app.get("/indexdeliberados")

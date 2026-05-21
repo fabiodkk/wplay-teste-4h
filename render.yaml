@@ -4,8 +4,9 @@ services:
     runtime: python
     plan: free
     autoDeploy: true
+    healthCheckPath: /healthz
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --threads 8 --timeout 120
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
