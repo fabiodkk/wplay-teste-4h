@@ -2,6 +2,7 @@ import base64
 import json
 import os
 import random
+import socket
 import string
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -94,14 +95,27 @@ def get_supabase_ref(access_token: str, project_name: str) -> str:
 
 def connect_db(db_password: str, project_ref: str):
     host = f"db.{project_ref}.supabase.co"
-    return psycopg2.connect(
-        host=host,
-        port=5432,
-        dbname="postgres",
-        user="postgres",
-        password=db_password,
-        sslmode="require",
-    )
+    conn_kwargs = {
+        "host": host,
+        "port": 5432,
+        "dbname": "postgres",
+        "user": "postgres",
+        "password": db_password,
+        "sslmode": "require",
+    }
+
+    # Some hosting providers may not have outbound IPv6 routes.
+    # If we can resolve an IPv4 address, force psycopg2 to use it.
+    try:
+        info = socket.getaddrinfo(host, 5432, socket.AF_INET, socket.SOCK_STREAM)
+        if info:
+            ipv4 = info[0][4][0]
+            if ipv4:
+                conn_kwargs["hostaddr"] = ipv4
+    except Exception:
+        pass
+
+    return psycopg2.connect(**conn_kwargs)
 
 
 def ensure_schema(conn):
