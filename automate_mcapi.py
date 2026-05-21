@@ -78,7 +78,7 @@ def build_lead_note(phone: str, telegram_id: str) -> str:
     return f"cap:{phone_mask}"
 
 
-def get_supabase_ref(access_token: str, project_name: str) -> str:
+def get_supabase_project_info(access_token: str, project_name: str) -> dict:
     resp = requests.get(
         "https://api.supabase.com/v1/projects",
         headers={"Authorization": f"Bearer {access_token}"},
@@ -88,15 +88,41 @@ def get_supabase_ref(access_token: str, project_name: str) -> str:
     projects = resp.json()
     for project in projects:
         if project.get("name") == project_name:
-            return project["id"]
+            return {
+                "ref": project.get("id") or project.get("ref"),
+                "region": project.get("region") or "",
+            }
     names = [project.get("name") for project in projects]
     raise RuntimeError(f"Projeto '{project_name}' nao encontrado. Disponiveis: {names}")
 
 
-def connect_db(db_password: str, project_ref: str):
-    host = f"db.{project_ref}.supabase.co"
-    conn_kwargs = {
-        "host": host,
+def get_supabase_ref(access_token: str, project_name: str) -> str:
+    return get_supabase_project_info(access_token, project_name)["ref"]
+
+
+def connect_with_ipv4_fallback(conn_kwargs: dict):
+    host = conn_kwargs.get("host")
+    port = int(conn_kwargs.get("port", 5432))
+    ipv4_kwargs = dict(conn_kwargs)
+    try:
+        info = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+        if info:
+            ipv4 = info[0][4][0]
+            if ipv4:
+                ipv4_kwargs["hostaddr"] = ipv4
+    except Exception:
+        pass
+
+    try:
+        return psycopg2.connect(**ipv4_kwargs)
+    except psycopg2.OperationalError:
+        return psycopg2.connect(**conn_kwargs)
+
+
+def connect_db(db_password: str, project_ref: str, project_region: str = ""):
+    direct_host = f"db.{project_ref}.supabase.co"
+    direct_kwargs = {
+        "host": direct_host,
         "port": 5432,
         "dbname": "postgres",
         "user": "postgres",
@@ -104,18 +130,29 @@ def connect_db(db_password: str, project_ref: str):
         "sslmode": "require",
     }
 
-    # Some hosting providers may not have outbound IPv6 routes.
-    # If we can resolve an IPv4 address, force psycopg2 to use it.
     try:
-        info = socket.getaddrinfo(host, 5432, socket.AF_INET, socket.SOCK_STREAM)
-        if info:
-            ipv4 = info[0][4][0]
-            if ipv4:
-                conn_kwargs["hostaddr"] = ipv4
-    except Exception:
-        pass
+        return connect_with_ipv4_fallback(direct_kwargs)
+    except psycopg2.OperationalError as direct_exc:
+        if not project_region:
+            raise direct_exc
 
-    return psycopg2.connect(**conn_kwargs)
+        pooler_host = f"aws-0-{project_region}.pooler.supabase.com"
+        last_exc = direct_exc
+        for pooler_port in (6543, 5432):
+            pooler_kwargs = {
+                "host": pooler_host,
+                "port": pooler_port,
+                "dbname": "postgres",
+                "user": f"postgres.{project_ref}",
+                "password": db_password,
+                "sslmode": "require",
+            }
+            try:
+                return connect_with_ipv4_fallback(pooler_kwargs)
+            except psycopg2.OperationalError as pooler_exc:
+                last_exc = pooler_exc
+
+        raise last_exc
 
 
 def ensure_schema(conn):
@@ -198,20 +235,26 @@ def load_config():
         raise RuntimeError("Variaveis faltando no .env. Confira o arquivo.")
 
     project_ref = os.getenv("SUPABASE_PROJECT_REF")
-    if not project_ref:
-        project_ref = get_supabase_ref(supabase_access_token, supabase_project_name)
+    project_region = os.getenv("SUPABASE_PROJECT_REGION", "")
+    if not project_ref or not project_region:
+        project_info = get_supabase_project_info(supabase_access_token, supabase_project_name)
+        if not project_ref:
+            project_ref = project_info["ref"]
+        if not project_region:
+            project_region = project_info.get("region", "")
 
     return {
         "mc_username": mc_username,
         "mc_password": mc_password,
         "project_ref": project_ref,
+        "project_region": project_region,
         "supabase_db_password": supabase_db_password,
     }
 
 
 def open_db_from_env():
     cfg = load_config()
-    conn = connect_db(cfg["supabase_db_password"], cfg["project_ref"])
+    conn = connect_db(cfg["supabase_db_password"], cfg["project_ref"], cfg.get("project_region", ""))
     ensure_schema(conn)
     return conn, cfg
 
