@@ -15,6 +15,8 @@ from psycopg2.extras import Json
 
 LOGIN_URL = "https://mcapi.knewcms.com:2087/auth/login"
 TEST_URL = "https://mcapi.knewcms.com:2087/lines/test"
+RESALE_MOVIE_URL = "https://mcapi.knewcms.com:2087/streams/resale/movie"
+RESALE_CANAL_URL = "https://mcapi.knewcms.com:2087/streams/resale/canal"
 BRAZIL_TZ = ZoneInfo("America/Sao_Paulo")
 TOKEN_LOCK_KEY = 92745131
 
@@ -31,6 +33,14 @@ TEST_HEADERS_BASE = {
     "accept": "application/json, text/plain, */*",
     "accept-language": "pt-BR,pt;q=0.9,en;q=0.8",
     "content-type": "application/json",
+    "origin": "https://wwpanel.link",
+    "referer": "https://wwpanel.link/",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+}
+
+STREAM_HEADERS_BASE = {
+    "accept": "application/json, text/plain, */*",
+    "accept-language": "pt-BR,pt;q=0.9,en;q=0.8",
     "origin": "https://wwpanel.link",
     "referer": "https://wwpanel.link/",
     "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
@@ -219,6 +229,17 @@ def ensure_schema(conn):
         )
         cur.execute(
             """
+            create table if not exists public.mcapi_user_token_cache (
+              user_id text primary key,
+              bearer_token text not null,
+              expires_at timestamptz,
+              created_at timestamptz not null default now(),
+              updated_at timestamptz not null default now()
+            );
+            """
+        )
+        cur.execute(
+            """
             create table if not exists public.usuarios_criados_ip (
               id bigserial primary key,
               client_ip text not null,
@@ -240,6 +261,9 @@ def ensure_schema(conn):
         )
         cur.execute(
             "create index if not exists idx_ip_liberados_ip_ativo on public.ip_liberados (ip, ativo);"
+        )
+        cur.execute(
+            "create index if not exists idx_mcapi_user_token_cache_updated on public.mcapi_user_token_cache (updated_at desc);"
         )
     conn.commit()
 
@@ -357,6 +381,78 @@ def create_test_line(bearer_token: str, note_text: str = ""):
     return resp.status_code, payload, body
 
 
+def fetch_resale_stream_page(bearer_token: str, stream_kind: str, page: int = 1):
+    safe_token = normalize_bearer_token(bearer_token)
+    kind = (stream_kind or "").strip().lower()
+    if kind == "movie":
+        url = RESALE_MOVIE_URL
+        params = {"removeTmdbNull": "true", "page": page}
+    elif kind == "canal":
+        url = RESALE_CANAL_URL
+        params = {"page": page}
+    else:
+        raise ValueError("stream_kind invalido")
+
+    headers = dict(STREAM_HEADERS_BASE)
+    headers["authorization"] = f"Bearer {safe_token}"
+    resp = requests.get(url, headers=headers, params=params, timeout=30)
+    try:
+        body = resp.json()
+    except Exception:
+        body = {"raw": resp.text}
+    return resp.status_code, {"url": url, "params": params}, body
+
+
+def parse_recent_datetime(value):
+    text = (value or "").strip()
+    if not text:
+        return None
+
+    for parser in (
+        lambda x: datetime.fromisoformat(x.replace("Z", "+00:00")),
+        lambda x: datetime.strptime(x, "%d/%m/%Y").replace(tzinfo=BRAZIL_TZ),
+    ):
+        try:
+            dt = parser(text)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+        except Exception:
+            continue
+    return None
+
+
+def normalize_recent_stream_items(payload, stream_kind: str, limit: int = 10):
+    safe_kind = (stream_kind or "").strip().lower()
+    rows = payload.get("data", []) if isinstance(payload, dict) else []
+    if not isinstance(rows, list):
+        return []
+
+    normalized = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        sort_text = row.get("sort_order") or row.get("release_date") or row.get("added") or ""
+        sort_dt = parse_recent_datetime(sort_text)
+        normalized.append(
+            {
+                "id": row.get("id") or "",
+                "title": row.get("title") or "",
+                "cover": row.get("cover") or "",
+                "backdrop": row.get("backdrop") or "",
+                "added": row.get("added") or "",
+                "sort_order": row.get("sort_order") or "",
+                "type_stream": row.get("type_stream") or "",
+                "kind": safe_kind,
+                "kind_label": "Filme" if safe_kind == "movie" else "Canal",
+                "sort_dt": sort_dt,
+            }
+        )
+
+    normalized.sort(key=lambda item: item.get("sort_dt") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    return normalized[: max(1, int(limit))]
+
+
 def parse_iso_to_utc(iso_text: str):
     if not iso_text:
         return None
@@ -369,18 +465,36 @@ def parse_iso_to_utc(iso_text: str):
         return None
 
 
-def parse_jwt_exp_to_utc(token: str):
+def normalize_bearer_token(token: str) -> str:
+    raw = (token or "").strip()
+    if not raw:
+        return ""
+    if raw.lower().startswith("bearer "):
+        return raw.split(" ", 1)[1].strip()
+    return raw
+
+
+def parse_jwt_payload(token: str):
+    safe_token = normalize_bearer_token(token)
     try:
-        parts = token.split(".")
+        parts = safe_token.split(".")
         if len(parts) < 2:
-            return None
+            return {}
         payload_b64 = parts[1]
         payload_b64 += "=" * (-len(payload_b64) % 4)
         payload_json = base64.urlsafe_b64decode(payload_b64.encode("utf-8")).decode("utf-8")
         payload = json.loads(payload_json)
-        exp = payload.get("exp")
-        if exp is None:
-            return None
+        return payload if isinstance(payload, dict) else {}
+    except Exception:
+        return {}
+
+
+def parse_jwt_exp_to_utc(token: str):
+    payload = parse_jwt_payload(token)
+    exp = payload.get("exp")
+    if exp is None:
+        return None
+    try:
         return datetime.fromtimestamp(int(exp), tz=timezone.utc)
     except Exception:
         return None
@@ -453,6 +567,123 @@ def save_cached_token(conn, token: str, expires_at):
     conn.commit()
 
 
+def save_user_cached_token(conn, token: str):
+    safe_token = normalize_bearer_token(token)
+    if not safe_token:
+        return {"user_id": None, "expires_at": None}
+
+    payload = parse_jwt_payload(safe_token)
+    user_id = payload.get("id")
+    user_id_text = str(user_id) if user_id is not None else None
+    expires_at = parse_jwt_exp_to_utc(safe_token)
+    if not expires_at:
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=18)
+
+    save_cached_token(conn, safe_token, expires_at)
+
+    if user_id_text:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into public.mcapi_user_token_cache (user_id, bearer_token, expires_at, updated_at)
+                values (%s, %s, %s, now())
+                on conflict (user_id)
+                do update
+                  set bearer_token = excluded.bearer_token,
+                      expires_at = excluded.expires_at,
+                      updated_at = now()
+                """,
+                (user_id_text, safe_token, expires_at),
+            )
+        conn.commit()
+
+    return {"user_id": user_id_text, "expires_at": expires_at}
+
+
+def get_user_cached_token(conn, user_id: str):
+    safe_user_id = (user_id or "").strip()
+    if not safe_user_id:
+        return None, None
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select bearer_token, expires_at
+            from public.mcapi_user_token_cache
+            where user_id = %s
+            """,
+            (safe_user_id,),
+        )
+        row = cur.fetchone()
+    if not row:
+        return None, None
+    return row[0], row[1]
+
+
+def get_latest_user_cached_token(conn):
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select user_id, bearer_token, expires_at
+            from public.mcapi_user_token_cache
+            order by updated_at desc
+            limit 1
+            """
+        )
+        row = cur.fetchone()
+    if not row:
+        return None, None, None
+    return row[0], row[1], row[2]
+
+
+def resolve_user_bearer_token(
+    conn,
+    provided_token: str = "",
+    preferred_user_id: str = "",
+    allow_shared_fallback: bool = False,
+):
+    safe_provided = normalize_bearer_token(provided_token)
+    if safe_provided:
+        saved = save_user_cached_token(conn, safe_provided)
+        return {
+            "token": safe_provided,
+            "source": "request_bearer",
+            "user_id": saved.get("user_id"),
+            "expires_at": saved.get("expires_at"),
+        }
+
+    safe_user_id = (preferred_user_id or "").strip()
+    if safe_user_id:
+        token, exp = get_user_cached_token(conn, safe_user_id)
+        if token and token_is_valid(exp, margin_seconds=0):
+            return {
+                "token": token,
+                "source": "user_cache",
+                "user_id": safe_user_id,
+                "expires_at": exp,
+            }
+
+    if allow_shared_fallback:
+        latest_user_id, latest_token, latest_exp = get_latest_user_cached_token(conn)
+        if latest_token and token_is_valid(latest_exp, margin_seconds=0):
+            return {
+                "token": latest_token,
+                "source": "latest_user_cache",
+                "user_id": latest_user_id,
+                "expires_at": latest_exp,
+            }
+
+        cached_token, cached_exp = get_cached_token(conn)
+        if cached_token and token_is_valid(cached_exp, margin_seconds=0):
+            return {
+                "token": cached_token,
+                "source": "legacy_shared_cache",
+                "user_id": None,
+                "expires_at": cached_exp,
+            }
+
+    return {"token": None, "source": "none", "user_id": None, "expires_at": None}
+
+
 def get_or_refresh_shared_token(conn, cfg, client_ip: str = None, force_refresh: bool = False):
     with conn.cursor() as cur:
         cur.execute("select pg_advisory_lock(%s);", (TOKEN_LOCK_KEY,))
@@ -494,6 +725,7 @@ def get_or_refresh_shared_token(conn, cfg, client_ip: str = None, force_refresh:
         if not expires_at:
             expires_at = datetime.now(timezone.utc) + timedelta(minutes=18)
         save_cached_token(conn, token, expires_at)
+        save_user_cached_token(conn, token)
 
         return {
             "ok": True,
@@ -708,6 +940,114 @@ def list_ip_liberados():
                 }
             )
         return data
+    finally:
+        conn.close()
+
+
+def summarize_stream_payload(payload):
+    if not isinstance(payload, dict):
+        return {"ok": False}
+    data = payload.get("data", [])
+    sample = []
+    if isinstance(data, list):
+        for row in data[:3]:
+            if isinstance(row, dict):
+                sample.append(row.get("id"))
+    return {
+        "ok": True,
+        "total": payload.get("total"),
+        "count": len(data) if isinstance(data, list) else 0,
+        "sample_ids": sample,
+    }
+
+
+def fetch_recent_streams_for_user(
+    provided_bearer: str = "",
+    preferred_user_id: str = "",
+    movies_limit: int = 12,
+    channels_limit: int = 12,
+    client_ip: str = None,
+    allow_shared_fallback: bool = False,
+):
+    conn, cfg = open_db_from_env()
+    try:
+        bearer_info = resolve_user_bearer_token(
+            conn,
+            provided_token=provided_bearer,
+            preferred_user_id=preferred_user_id,
+            allow_shared_fallback=allow_shared_fallback,
+        )
+        bearer_token = bearer_info.get("token")
+        if not bearer_token and allow_shared_fallback:
+            token_info = get_or_refresh_shared_token(conn, cfg, client_ip=client_ip, force_refresh=False)
+            if token_info.get("ok") and token_info.get("token"):
+                bearer_token = token_info.get("token")
+                bearer_info = {
+                    "source": "shared_token",
+                    "user_id": None,
+                }
+
+        if not bearer_token:
+            return {
+                "ok": False,
+                "error": "Nenhum bearer disponivel para este usuario.",
+                "token_source": bearer_info.get("source"),
+                "user_id": bearer_info.get("user_id"),
+                "movies": [],
+                "channels": [],
+                "merged": [],
+            }
+
+        movie_status, movie_req, movie_resp = fetch_resale_stream_page(bearer_token, "movie", page=1)
+        save_event(
+            conn,
+            event_type="resale_movie_recent",
+            status_code=movie_status,
+            request_payload=movie_req,
+            response_payload=summarize_stream_payload(movie_resp),
+            error_message=None if movie_status < 400 else "movie recent fetch failed",
+            client_ip=client_ip,
+        )
+
+        channel_status, channel_req, channel_resp = fetch_resale_stream_page(bearer_token, "canal", page=1)
+        save_event(
+            conn,
+            event_type="resale_canal_recent",
+            status_code=channel_status,
+            request_payload=channel_req,
+            response_payload=summarize_stream_payload(channel_resp),
+            error_message=None if channel_status < 400 else "canal recent fetch failed",
+            client_ip=client_ip,
+        )
+
+        movies = normalize_recent_stream_items(movie_resp, "movie", limit=movies_limit) if movie_status < 400 else []
+        channels = normalize_recent_stream_items(channel_resp, "canal", limit=channels_limit) if channel_status < 400 else []
+        merged = sorted(
+            movies + channels,
+            key=lambda item: item.get("sort_dt") or datetime.min.replace(tzinfo=timezone.utc),
+            reverse=True,
+        )
+
+        for row in merged:
+            sort_dt = row.get("sort_dt")
+            if not row.get("added") and sort_dt:
+                row["added"] = sort_dt.astimezone(BRAZIL_TZ).strftime("%d/%m/%Y")
+            row.pop("sort_dt", None)
+        for row in movies:
+            row.pop("sort_dt", None)
+        for row in channels:
+            row.pop("sort_dt", None)
+
+        return {
+            "ok": movie_status < 400 and channel_status < 400,
+            "token_source": bearer_info.get("source"),
+            "user_id": bearer_info.get("user_id"),
+            "movie_status": movie_status,
+            "channel_status": channel_status,
+            "movies": movies,
+            "channels": channels,
+            "merged": merged,
+        }
     finally:
         conn.close()
 

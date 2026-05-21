@@ -5,6 +5,7 @@ from flask import Flask, render_template, request
 from automate_mcapi import (
     add_ip_liberado,
     check_ip_limits,
+    fetch_recent_streams_for_user,
     generate_access_once,
     get_active_access_for_ip,
     list_ip_liberados,
@@ -50,6 +51,35 @@ def get_client_ip(req) -> str:
     return req.remote_addr or "desconhecido"
 
 
+def extract_bearer_from_request(req) -> str:
+    auth = (req.headers.get("Authorization") or "").strip()
+    if auth.lower().startswith("bearer "):
+        return auth.split(" ", 1)[1].strip()
+    return (req.args.get("bearer") or "").strip()
+
+
+def safe_recent_media(req, client_ip: str):
+    bearer = extract_bearer_from_request(req)
+    preferred_user_id = (req.args.get("user_id") or req.headers.get("X-Mcapi-User-Id") or "").strip()
+    try:
+        result = fetch_recent_streams_for_user(
+            provided_bearer=bearer,
+            preferred_user_id=preferred_user_id,
+            movies_limit=10,
+            channels_limit=10,
+            client_ip=client_ip,
+            allow_shared_fallback=True,
+        )
+    except Exception:
+        return {"items": [], "ok": False, "token_source": "error"}
+
+    return {
+        "items": result.get("merged", [])[:12],
+        "ok": bool(result.get("ok")),
+        "token_source": result.get("token_source", "none"),
+    }
+
+
 def render_liberados(status_msg="", is_error=False):
     client_ip = get_client_ip(request)
     rows = list_ip_liberados()
@@ -66,12 +96,14 @@ def render_liberados(status_msg="", is_error=False):
 def index():
     client_ip = get_client_ip(request)
     limit_info = safe_check_ip_limits(client_ip)
+    recent_media = safe_recent_media(request, client_ip)
     return render_template(
         "index.html",
         result=None,
         basic=None,
         client_ip=client_ip,
         limit_info=limit_info,
+        recent_media=recent_media["items"],
         error_msg="",
         info_msg="",
         form_phone="",
@@ -82,6 +114,7 @@ def index():
 @app.post("/gerar")
 def gerar():
     client_ip = get_client_ip(request)
+    recent_media = safe_recent_media(request, client_ip)
     telefone = (request.form.get("telefone") or "").strip()
     telegram_id = (request.form.get("telegram_id") or "").strip()
 
@@ -92,6 +125,7 @@ def gerar():
             basic=None,
             client_ip=client_ip,
             limit_info=safe_check_ip_limits(client_ip),
+            recent_media=recent_media["items"],
             error_msg="Para liberar seu teste, informe um WhatsApp valido.",
             info_msg="",
             form_phone=telefone,
@@ -118,6 +152,7 @@ def gerar():
             basic=basic,
             client_ip=client_ip,
             limit_info=safe_check_ip_limits(client_ip),
+            recent_media=recent_media["items"],
             error_msg="",
             info_msg="Seu teste atual ainda esta ativo. Reapresentamos o mesmo acesso para voce continuar.",
             form_phone=telefone,
@@ -133,6 +168,7 @@ def gerar():
             basic=None,
             client_ip=client_ip,
             limit_info=limit_info,
+            recent_media=recent_media["items"],
             error_msg="Seu teste ja foi gerado recentemente. Assim que liberar novamente, voce consegue gerar de novo.",
             info_msg="",
             form_phone=telefone,
@@ -161,6 +197,7 @@ def gerar():
         basic=basic,
         client_ip=client_ip,
         limit_info=limit_info,
+        recent_media=recent_media["items"],
         error_msg=error_msg,
         info_msg=info_msg,
         form_phone=telefone,
@@ -171,6 +208,23 @@ def gerar():
 @app.get("/healthz")
 def healthz():
     return {"ok": True, "service": "wplay-teste-4h"}, 200
+
+
+@app.get("/api/recentes")
+def api_recentes():
+    client_ip = get_client_ip(request)
+    bearer = extract_bearer_from_request(request)
+    preferred_user_id = (request.args.get("user_id") or request.headers.get("X-Mcapi-User-Id") or "").strip()
+    result = fetch_recent_streams_for_user(
+        provided_bearer=bearer,
+        preferred_user_id=preferred_user_id,
+        movies_limit=20,
+        channels_limit=20,
+        client_ip=client_ip,
+        allow_shared_fallback=True,
+    )
+    status_code = 200 if result.get("ok") else 400
+    return result, status_code
 
 
 @app.get("/indexdeliberados")

@@ -995,77 +995,64 @@
         <p class="vitrine-sub">Veja um gostinho do catalogo: HBO, Disney, infantil, noticias, series e esportes ao vivo.</p>
         <div class="vitrine-viewport">
           <div class="vitrine-track" id="vitrineTrack">
-            <article class="vitrine-card">
-              <img src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=900&q=80" alt="Cartaz de filme em destaque">
-              <div class="vitrine-meta">
-                <span class="vitrine-tag">Filmes em destaque</span>
-                <div class="vitrine-logos">
-                  <img src="https://img.icons8.com/color/48/hbo.png" alt="HBO">
-                  <img src="https://img.icons8.com/color/48/netflix.png" alt="Netflix">
-                  <img src="https://img.icons8.com/color/48/disney-logo.png" alt="Disney">
+            {% if recent_media %}
+              {% for item in recent_media %}
+                <article class="vitrine-card">
+                  <img src="{{ item.cover or item.backdrop or 'https://images.unsplash.com/photo-1505238680356-667803448bb6?auto=format&fit=crop&w=900&q=80' }}" alt="{{ item.title or 'Conteudo recente' }}">
+                  <div class="vitrine-meta">
+                    <span class="vitrine-tag">{{ item.kind_label }}{% if item.added %} • {{ item.added }}{% endif %}</span>
+                  </div>
+                </article>
+              {% endfor %}
+            {% else %}
+              <article class="vitrine-card">
+                <img src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=900&q=80" alt="Cartaz de filme em destaque">
+                <div class="vitrine-meta">
+                  <span class="vitrine-tag">Filmes em destaque</span>
+                  <div class="vitrine-logos">
+                    <img src="https://img.icons8.com/color/48/hbo.png" alt="HBO">
+                    <img src="https://img.icons8.com/color/48/netflix.png" alt="Netflix">
+                    <img src="https://img.icons8.com/color/48/disney-logo.png" alt="Disney">
+                  </div>
                 </div>
-              </div>
-            </article>
+              </article>
 
-            <article class="vitrine-card">
-              <img src="https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=900&q=80" alt="Cinema premium em casa">
-              <div class="vitrine-meta">
-                <span class="vitrine-tag">Series premium</span>
-                <div class="vitrine-logos">
-                  <img src="https://img.icons8.com/color/48/hulu.png" alt="Hulu">
-                  <img src="https://img.icons8.com/color/48/netflix.png" alt="Netflix">
-                  <img src="https://img.icons8.com/color/48/hbo.png" alt="HBO">
+              <article class="vitrine-card">
+                <img src="https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=900&q=80" alt="Cinema premium em casa">
+                <div class="vitrine-meta">
+                  <span class="vitrine-tag">Series premium</span>
+                  <div class="vitrine-logos">
+                    <img src="https://img.icons8.com/color/48/hulu.png" alt="Hulu">
+                    <img src="https://img.icons8.com/color/48/netflix.png" alt="Netflix">
+                    <img src="https://img.icons8.com/color/48/hbo.png" alt="HBO">
+                  </div>
                 </div>
-              </div>
-            </article>
+              </article>
 
-            <article class="vitrine-card">
-              <img src="https://images.unsplash.com/photo-1511886929837-354d827aae26?auto=format&fit=crop&w=900&q=80" alt="Estadio lotado para futebol ao vivo">
-              <div class="vitrine-meta">
-                <span class="vitrine-tag">Esportes ao vivo</span>
-                <div class="vitrine-logos">
-                  <img src="https://img.icons8.com/color/48/espn.png" alt="ESPN">
-                  <img src="https://img.icons8.com/color/48/football2.png" alt="Futebol">
-                  <img src="https://img.icons8.com/color/48/cnn.png" alt="Noticias">
+              <article class="vitrine-card">
+                <img src="https://images.unsplash.com/photo-1511886929837-354d827aae26?auto=format&fit=crop&w=900&q=80" alt="Estadio lotado para futebol ao vivo">
+                <div class="vitrine-meta">
+                  <span class="vitrine-tag">Esportes ao vivo</span>
+                  <div class="vitrine-logos">
+                    <img src="https://img.icons8.com/color/48/espn.png" alt="ESPN">
+                    <img src="https://img.icons8.com/color/48/football2.png" alt="Futebol">
+                    <img src="https://img.icons8.com/color/48/cnn.png" alt="Noticias">
+                  </div>
                 </div>
-              </div>
-            </article>
+              </article>
 
-            <article class="vitrine-card">
-              <img src="https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?auto=format&fit=crop&w=900&q=80" alt="Programacao infantil colorida">
-              <div class="vitrine-meta">
-                <span class="vitrine-tag">Infantil e familia</span>
-                <div class="vitrine-logos">
-                  <img src="https://img.icons8.com/color/48/nickelodeon.png" alt="Nickelodeon">
-                  <img src="https://img.icons8.com/color/48/disney-logo.png" alt="Disney">
-                  <img src="https://img.icons8.com/color/48/youtube-play.png" alt="YouTube">
+              <article class="vitrine-card">
+                <img src="https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?auto=format&fit=crop&w=900&q=80" alt="Programacao infantil colorida">
+                <div class="vitrine-meta">
+                  <span class="vitrine-tag">Infantil e familia</span>
+                  <div class="vitrine-logos">
+                    <img src="https://img.icons8.com/color/48/nickelodeon.png" alt="Nickelodeon">
+                    <img src="https://img.icons8.com/color/48/disney-logo.png" alt="Disney">
+                    <img src="https://img.icons8.com/color/48/youtube-play.png" alt="YouTube">
+                  </div>
                 </div>
-              </div>
-            </article>
-
-            <article class="vitrine-card">
-              <img src="https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?auto=format&fit=crop&w=900&q=80" alt="Programas de noticias e coberturas ao vivo">
-              <div class="vitrine-meta">
-                <span class="vitrine-tag">Noticias 24h</span>
-                <div class="vitrine-logos">
-                  <img src="https://img.icons8.com/color/48/cnn.png" alt="CNN">
-                  <img src="https://img.icons8.com/color/48/youtube-play.png" alt="YouTube">
-                  <img src="https://img.icons8.com/color/48/espn.png" alt="ESPN">
-                </div>
-              </div>
-            </article>
-
-            <article class="vitrine-card">
-              <img src="https://images.unsplash.com/photo-1505238680356-667803448bb6?auto=format&fit=crop&w=900&q=80" alt="Catalogo com filmes e series populares">
-              <div class="vitrine-meta">
-                <span class="vitrine-tag">Lancamentos</span>
-                <div class="vitrine-logos">
-                  <img src="https://img.icons8.com/color/48/amazon-prime-video.png" alt="Prime Video">
-                  <img src="https://img.icons8.com/color/48/netflix.png" alt="Netflix">
-                  <img src="https://img.icons8.com/color/48/hbo.png" alt="HBO">
-                </div>
-              </div>
-            </article>
+              </article>
+            {% endif %}
           </div>
         </div>
       </div>
