@@ -119,7 +119,13 @@ def connect_with_ipv4_fallback(conn_kwargs: dict):
         return psycopg2.connect(**conn_kwargs)
 
 
-def connect_db(db_password: str, project_ref: str, project_region: str = ""):
+def connect_db(
+    db_password: str,
+    project_ref: str,
+    project_region: str = "",
+    pooler_host_override: str = "",
+    pooler_port_override: str = "",
+):
     direct_host = f"db.{project_ref}.supabase.co"
     direct_kwargs = {
         "host": direct_host,
@@ -136,13 +142,25 @@ def connect_db(db_password: str, project_ref: str, project_region: str = ""):
         if not project_region:
             raise direct_exc
 
-        pooler_hosts = [
-            f"aws-1-{project_region}.pooler.supabase.com",
-            f"aws-0-{project_region}.pooler.supabase.com",
-        ]
+        pooler_hosts = []
+        if pooler_host_override:
+            pooler_hosts.append(pooler_host_override)
+        else:
+            pooler_hosts = [
+                f"aws-1-{project_region}.pooler.supabase.com",
+                f"aws-0-{project_region}.pooler.supabase.com",
+            ]
+        pooler_ports = []
+        if pooler_port_override:
+            try:
+                pooler_ports.append(int(pooler_port_override))
+            except ValueError:
+                pass
+        if not pooler_ports:
+            pooler_ports = [6543, 5432]
         last_exc = direct_exc
         for pooler_host in pooler_hosts:
-            for pooler_port in (6543, 5432):
+            for pooler_port in pooler_ports:
                 pooler_kwargs = {
                     "host": pooler_host,
                     "port": pooler_port,
@@ -240,6 +258,8 @@ def load_config():
 
     project_ref = os.getenv("SUPABASE_PROJECT_REF")
     project_region = os.getenv("SUPABASE_PROJECT_REGION", "")
+    supabase_pooler_host = os.getenv("SUPABASE_POOLER_HOST", "")
+    supabase_pooler_port = os.getenv("SUPABASE_POOLER_PORT", "")
     if not project_ref or not project_region:
         project_info = get_supabase_project_info(supabase_access_token, supabase_project_name)
         if not project_ref:
@@ -252,13 +272,21 @@ def load_config():
         "mc_password": mc_password,
         "project_ref": project_ref,
         "project_region": project_region,
+        "supabase_pooler_host": supabase_pooler_host,
+        "supabase_pooler_port": supabase_pooler_port,
         "supabase_db_password": supabase_db_password,
     }
 
 
 def open_db_from_env():
     cfg = load_config()
-    conn = connect_db(cfg["supabase_db_password"], cfg["project_ref"], cfg.get("project_region", ""))
+    conn = connect_db(
+        cfg["supabase_db_password"],
+        cfg["project_ref"],
+        cfg.get("project_region", ""),
+        cfg.get("supabase_pooler_host", ""),
+        cfg.get("supabase_pooler_port", ""),
+    )
     ensure_schema(conn)
     return conn, cfg
 
