@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IPs Liberados</title>
+  <style>
+    :root { --bg:#f2f4f8; --card:#ffffff; --txt:#16212f; --ok:#166534; --err:#991b1b; --btn:#0f766e; --btn2:#115e59; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:linear-gradient(135deg,#e0f2fe,#ecfeff);color:var(--txt)}
+    .wrap{max-width:980px;margin:40px auto;padding:20px}
+    .card{background:var(--card);border-radius:14px;padding:24px;box-shadow:0 12px 35px rgba(15,23,42,.12)}
+    h1{margin:0 0 14px;font-size:28px}
+    p{margin:0 0 16px}
+    .status{margin:12px 0;font-weight:700}
+    .ok{color:var(--ok)}
+    .err{color:var(--err)}
+    .grid{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin:16px 0}
+    input{padding:10px;border:1px solid #cbd5e1;border-radius:8px;width:100%}
+    button{background:var(--btn);border:0;color:#fff;padding:10px 14px;border-radius:8px;cursor:pointer;font-weight:600}
+    button:hover{background:var(--btn2)}
+    table{width:100%;border-collapse:collapse;margin-top:16px}
+    th,td{padding:10px;border-bottom:1px solid #e2e8f0;text-align:left;font-size:14px}
+    .tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;background:#dcfce7;color:#166534}
+    .tag.off{background:#fee2e2;color:#991b1b}
+    .back{display:inline-block;margin-top:12px;color:#0f766e;text-decoration:none;font-weight:600}
+    .back:hover{text-decoration:underline}
+    form.inline{display:inline}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <h1>Gerenciamento de IPs Liberados</h1>
+      <p>Seu IP atual: <strong>{{ client_ip }}</strong></p>
+
+      {% if status_msg %}
+        <div class="status {{ 'err' if is_error else 'ok' }}">{{ status_msg }}</div>
+      {% endif %}
+
+      <form method="post" action="/indexdeliberados/adicionar">
+        <div class="grid">
+          <input type="text" name="ip" placeholder="IP para liberar" required>
+          <input type="text" name="descricao" placeholder="Descrição (ex: Cliente VIP)">
+          <button type="submit">Liberar IP</button>
+        </div>
+      </form>
+      <form method="post" action="/indexdeliberados/liberar-meu-ip">
+        <button type="submit">Liberar meu IP atual</button>
+      </form>
+
+      <table>
+        <thead>
+          <tr>
+            <th>IP</th>
+            <th>Descrição</th>
+            <th>Status</th>
+            <th>Criado</th>
+            <th>Atualizado</th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <td>{{ row.ip }}</td>
+              <td>{{ row.descricao }}</td>
+              <td>
+                {% if row.ativo %}
+                  <span class="tag">Ativo</span>
+                {% else %}
+                  <span class="tag off">Inativo</span>
+                {% endif %}
+              </td>
+              <td>{{ row.created_at }}</td>
+              <td>{{ row.updated_at }}</td>
+              <td>
+                {% if row.ativo %}
+                  <form class="inline" method="post" action="/indexdeliberados/remover">
+                    <input type="hidden" name="ip" value="{{ row.ip }}">
+                    <button type="submit">Remover</button>
+                  </form>
+                {% else %}
+                  <form class="inline" method="post" action="/indexdeliberados/adicionar">
+                    <input type="hidden" name="ip" value="{{ row.ip }}">
+                    <input type="hidden" name="descricao" value="{{ row.descricao }}">
+                    <button type="submit">Reativar</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <a class="back" href="/">Voltar para geração</a>
+    </section>
+  </main>
+</body>
+</html>

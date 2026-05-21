@@ -1,0 +1,1484 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Teste 4H | WPlay</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;800&family=Teko:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-0: #03111e;
+      --bg-1: #08263d;
+      --bg-2: #0d3a53;
+      --ink: #ecf7ff;
+      --soft: #aed0e6;
+      --line: rgba(110, 231, 255, .24);
+      --line-strong: rgba(255, 255, 255, .18);
+      --card: rgba(6, 24, 39, .74);
+      --card-2: rgba(4, 18, 30, .9);
+      --brand: #16d5c7;
+      --brand-2: #0ea79d;
+      --cta: #ff8f1f;
+      --cta-2: #ff5c1d;
+      --ok: #34d399;
+      --bad: #fb7185;
+      --gold: #ffd89b;
+      --shadow: 0 26px 52px rgba(2, 8, 20, .48);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { min-height: 100%; }
+
+    body {
+      margin: 0;
+      font-family: 'Outfit', sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 560px at 8% -12%, rgba(20, 184, 166, .24), transparent 64%),
+        radial-gradient(1100px 560px at 100% 0%, rgba(59, 130, 246, .28), transparent 64%),
+        linear-gradient(165deg, var(--bg-0) 0%, var(--bg-1) 48%, var(--bg-2) 100%);
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: -4vh 0 0 0;
+      background: url("{{ url_for('static', filename='images/convocacao.png') }}") center 20% / cover no-repeat;
+      opacity: .16;
+      transform: scale(1.08);
+      filter: saturate(1.1) contrast(1.05);
+      z-index: -3;
+      pointer-events: none;
+      animation: slow-pan 34s ease-in-out infinite alternate;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        repeating-linear-gradient(120deg, rgba(255, 255, 255, .02) 0 1px, transparent 1px 32px),
+        radial-gradient(circle at 78% 22%, rgba(255, 153, 0, .14), transparent 38%),
+        radial-gradient(circle at 18% 76%, rgba(34, 211, 238, .12), transparent 36%);
+      pointer-events: none;
+      z-index: -2;
+      mix-blend-mode: screen;
+    }
+
+    @keyframes slow-pan {
+      from { transform: scale(1.05) translateY(0); }
+      to { transform: scale(1.12) translateY(-18px); }
+    }
+
+    @keyframes pulse-glow {
+      0% { box-shadow: 0 0 0 0 rgba(255, 140, 31, .36); }
+      70% { box-shadow: 0 0 0 20px rgba(255, 140, 31, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(255, 140, 31, 0); }
+    }
+
+    @keyframes bolt {
+      0%, 100% { transform: rotate(-8deg) scale(1); }
+      50% { transform: rotate(8deg) scale(1.12); }
+    }
+
+    @keyframes float-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .wrap {
+      width: min(1100px, 93vw);
+      margin: 18px auto 72px;
+      display: grid;
+      gap: 16px;
+      animation: float-in .45s ease both;
+    }
+
+    .card {
+      background: linear-gradient(145deg, rgba(10, 31, 49, .86), rgba(5, 21, 34, .82));
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(8px);
+      isolation: isolate;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: -45% auto auto -30%;
+      width: 260px;
+      height: 260px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(20, 184, 166, .22), transparent 72%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      border: 1px solid rgba(255, 255, 255, .06);
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: #d7f9ff;
+      background: rgba(16, 85, 108, .56);
+      border: 1px solid rgba(110, 231, 255, .3);
+      border-radius: 999px;
+      padding: 6px 11px;
+      margin-bottom: 10px;
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      font-family: 'Teko', sans-serif;
+      font-weight: 600;
+      letter-spacing: .01em;
+      line-height: .98;
+      text-transform: uppercase;
+      color: #f3fbff;
+      text-wrap: balance;
+    }
+
+    h1 { font-size: clamp(1.85rem, 5.2vw, 2.62rem); }
+    h2 { font-size: clamp(1.55rem, 4.3vw, 2.06rem); }
+    h3 { font-size: clamp(1.4rem, 4vw, 1.85rem); }
+
+    .sub {
+      margin: 10px 0 0;
+      color: var(--soft);
+      font-size: 13px;
+      line-height: 1.5;
+      max-width: 64ch;
+    }
+
+    .hero-top {
+      display: grid;
+      grid-template-columns: 70px 1fr;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .logo-bot {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid rgba(255, 255, 255, .9);
+      box-shadow: 0 18px 28px rgba(0, 0, 0, .32);
+      animation: pulse-glow 2.8s infinite;
+      background: #fff;
+    }
+
+    .mini-badges {
+      margin-top: 12px;
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .badge {
+      border: 1px solid rgba(110, 231, 255, .34);
+      background: linear-gradient(130deg, rgba(9, 50, 74, .8), rgba(12, 66, 98, .6));
+      border-radius: 12px;
+      padding: 9px;
+      font-size: 12px;
+      color: #dff8ff;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .grid {
+      margin-top: 14px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .row {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1fr;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid rgba(186, 230, 253, .34);
+      background: rgba(2, 18, 31, .66);
+      color: #f6fdff;
+      border-radius: 13px;
+      font-size: 14px;
+      padding: 12px;
+      outline: none;
+      transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+    }
+
+    input::placeholder { color: #82a8be; }
+
+    input:focus {
+      border-color: #67e8f9;
+      box-shadow: 0 0 0 3px rgba(34, 211, 238, .22);
+      transform: translateY(-1px);
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 13px;
+      padding: 12px 14px;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: .22s ease;
+    }
+
+    .btn-main {
+      background: linear-gradient(136deg, var(--brand), var(--brand-2));
+      color: #032a2a;
+      box-shadow: 0 14px 22px rgba(17, 168, 156, .32);
+    }
+
+    .btn-main:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.07);
+    }
+
+    .btn-light {
+      background: linear-gradient(136deg, #f9fbff, #dcefff);
+      color: #08263d;
+      border: 1px solid rgba(255, 255, 255, .4);
+    }
+
+    .btn-zap {
+      background: linear-gradient(136deg, #22c55e, #16a34a);
+      color: #03240f;
+    }
+
+    .result {
+      margin-top: 12px;
+      border-radius: 15px;
+      padding: 14px;
+      border: 1px solid rgba(52, 211, 153, .45);
+      background: linear-gradient(145deg, rgba(4, 49, 35, .78), rgba(3, 31, 25, .78));
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .04);
+    }
+
+    .result.bad {
+      border-color: rgba(251, 113, 133, .45);
+      background: linear-gradient(145deg, rgba(71, 9, 20, .7), rgba(45, 7, 16, .75));
+    }
+
+    .status {
+      margin: 0;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .status.ok { color: #86efac; }
+    .status.err { color: #fecdd3; }
+
+    .cred {
+      margin-top: 10px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .pill {
+      background: linear-gradient(140deg, rgba(3, 15, 27, .92), rgba(6, 27, 44, .9));
+      color: #d5ecff;
+      border: 1px solid rgba(110, 231, 255, .24);
+      border-radius: 11px;
+      padding: 10px;
+      font-size: 13px;
+      word-break: break-word;
+    }
+
+    .tiny {
+      margin: 12px 0 0;
+      font-size: 11px;
+      color: #8cb0c6;
+      line-height: 1.45;
+    }
+
+    .wizard-box {
+      margin-top: 12px;
+      border: 1px solid rgba(186, 230, 253, .2);
+      background: linear-gradient(158deg, rgba(4, 20, 34, .86), rgba(8, 32, 50, .9));
+      border-radius: 16px;
+      padding: 10px;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .05);
+    }
+
+    .guide-toolbar {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .guide-voice-btn {
+      border: 1px solid rgba(186, 230, 253, .36);
+      background: rgba(2, 22, 36, .82);
+      color: #e6f8ff;
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .guide-voice-btn.active {
+      border-color: #2dd4bf;
+      background: rgba(13, 148, 136, .2);
+      color: #ccfbf1;
+    }
+
+    .guide-voice-note {
+      font-size: 11px;
+      color: #91b7cb;
+      line-height: 1.35;
+    }
+
+    .chat {
+      max-height: 370px;
+      overflow: auto;
+      padding-right: 4px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .chat::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    .chat::-webkit-scrollbar-thumb {
+      background: rgba(110, 231, 255, .3);
+      border-radius: 999px;
+    }
+
+    .bubble {
+      padding: 10px 12px;
+      border-radius: 13px;
+      font-size: 13px;
+      line-height: 1.46;
+      width: fit-content;
+      max-width: 94%;
+    }
+
+    .bubble.bot {
+      background: linear-gradient(145deg, rgba(14, 66, 95, .95), rgba(16, 78, 109, .9));
+      color: #d6f3ff;
+      border: 1px solid rgba(125, 211, 252, .24);
+      border-top-left-radius: 4px;
+    }
+
+    .bubble.user {
+      margin-left: auto;
+      background: linear-gradient(145deg, rgba(3, 16, 29, .95), rgba(6, 24, 40, .95));
+      color: #f6fcff;
+      border: 1px solid rgba(255, 255, 255, .12);
+      border-top-right-radius: 4px;
+    }
+
+    .choice-grid {
+      margin-top: 10px;
+      display: grid;
+      gap: 8px;
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .choice-btn {
+      border: 1px solid rgba(125, 211, 252, .4);
+      background: linear-gradient(145deg, rgba(7, 35, 53, .88), rgba(5, 24, 38, .9));
+      color: #e8f8ff;
+      border-radius: 11px;
+      padding: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      text-align: center;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      transition: transform .2s ease, border-color .2s ease, filter .2s ease;
+    }
+
+    .choice-btn:hover {
+      transform: translateY(-1px);
+      border-color: rgba(110, 231, 255, .85);
+      filter: brightness(1.06);
+    }
+
+    .advanced {
+      margin-top: 10px;
+      border: 1px dashed rgba(251, 191, 36, .45);
+      background: linear-gradient(145deg, rgba(74, 42, 8, .45), rgba(53, 28, 5, .5));
+      border-radius: 12px;
+      padding: 10px;
+      display: none;
+    }
+
+    .advanced h4 {
+      margin: 0;
+      font-size: 14px;
+      color: #ffe4ad;
+      font-family: 'Teko', sans-serif;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .advanced p, .advanced li {
+      font-size: 12px;
+      color: #ffd9a1;
+      line-height: 1.45;
+    }
+
+    .advanced a {
+      color: #fff3c4;
+      text-decoration-color: rgba(255, 243, 196, .7);
+    }
+
+    .advanced ul { margin: 8px 0 0 16px; padding: 0; }
+
+    .promo {
+      border: 1px solid rgba(255, 160, 60, .4);
+      background: linear-gradient(155deg, rgba(67, 30, 2, .7) 0%, rgba(95, 34, 4, .72) 45%, rgba(57, 20, 2, .78) 100%);
+      border-radius: 18px;
+      padding: 14px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06);
+    }
+
+    .promo::before {
+      content: "";
+      position: absolute;
+      inset: auto -44px -44px auto;
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 171, 64, .38), transparent 72%);
+      pointer-events: none;
+    }
+
+    .promo-head {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .timer-box {
+      border: 1px solid rgba(255, 209, 143, .5);
+      background: rgba(255, 248, 235, .1);
+      border-radius: 12px;
+      padding: 10px;
+      min-width: 160px;
+    }
+
+    .timer-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      font-weight: 800;
+      color: #ffe3bf;
+    }
+
+    .timer-val {
+      margin-top: 4px;
+      font-family: 'Teko', sans-serif;
+      font-size: 32px;
+      line-height: .9;
+      color: #fff2dd;
+    }
+
+    .promo p {
+      margin: 8px 0 0;
+      font-size: 13px;
+      color: var(--gold);
+      line-height: 1.5;
+      position: relative;
+    }
+
+    .promo a {
+      color: #fff7e6;
+      text-decoration-color: rgba(255, 247, 230, .64);
+    }
+
+    .cta {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      position: relative;
+    }
+
+    .convocacao {
+      margin-top: 12px;
+      border: 1px solid rgba(255, 255, 255, .22);
+      border-radius: 15px;
+      overflow: hidden;
+      box-shadow: 0 18px 32px rgba(2, 8, 20, .35);
+      background: rgba(2, 8, 20, .45);
+    }
+
+    .convocacao img {
+      width: 100%;
+      display: block;
+      object-fit: cover;
+      max-height: 320px;
+      transform: translateY(var(--parallax-offset, 0));
+      transition: transform .15s linear, filter .2s ease;
+      filter: saturate(1.08) contrast(1.04);
+    }
+
+    .offer-pop {
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      width: min(348px, calc(100vw - 28px));
+      background: linear-gradient(140deg, #081f34, #0b3251 52%, #0f7f77);
+      color: #fff;
+      border-radius: 15px;
+      padding: 12px;
+      z-index: 30;
+      box-shadow: 0 20px 44px rgba(2, 6, 23, .52);
+      border: 1px solid rgba(255, 255, 255, .28);
+      transform: translateY(120%);
+      opacity: 0;
+      transition: .45s ease;
+      backdrop-filter: blur(8px);
+    }
+
+    .offer-pop.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .offer-row {
+      display: grid;
+      grid-template-columns: 30px 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .bolt {
+      font-size: 22px;
+      animation: bolt .7s infinite;
+      transform-origin: center;
+      filter: drop-shadow(0 0 10px rgba(250, 204, 21, .8));
+    }
+
+    .offer-title {
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.26;
+      color: #f5fbff;
+    }
+
+    .offer-close {
+      border: 0;
+      background: transparent;
+      color: #d4ecff;
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .offer-time {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #ffdb91;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .offer-actions {
+      margin-top: 8px;
+      display: grid;
+      gap: 6px;
+      grid-template-columns: 1fr;
+    }
+
+    .btn-pop {
+      border-radius: 10px;
+      border: 0;
+      padding: 10px;
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      text-decoration: none;
+      text-align: center;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      transition: transform .2s ease, filter .2s ease;
+    }
+
+    .btn-pop:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.06);
+    }
+
+    .btn-pop-copy {
+      background: linear-gradient(136deg, #fbbf24, #fb923c);
+      color: #3f2400;
+    }
+
+    .btn-pop-zap {
+      background: linear-gradient(136deg, #22c55e, #16a34a);
+      color: #07280f;
+    }
+
+    .video-rescue {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, .78);
+      z-index: 40;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      opacity: 0;
+      pointer-events: none;
+      transition: .35s ease;
+    }
+
+    .video-rescue.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .video-rescue-card {
+      width: min(560px, 100%);
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, .3);
+      background: linear-gradient(158deg, #081c30, #0b3150 55%, #0d6d66);
+      color: #fff;
+      padding: 12px;
+      box-shadow: 0 20px 44px rgba(2, 6, 23, .56);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .video-rescue-close {
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      border: 0;
+      background: transparent;
+      color: #d4ecff;
+      font-size: 22px;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .video-rescue h4 {
+      margin: 0 24px 6px 0;
+      font-family: 'Teko', sans-serif;
+      font-size: 26px;
+      line-height: 1;
+      letter-spacing: .03em;
+      text-transform: uppercase;
+      color: #eef8ff;
+    }
+
+    .video-rescue p {
+      margin: 0 0 8px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: #c8e6f6;
+    }
+
+    .video-rescue video {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, .25);
+      background: #000;
+      display: block;
+      max-height: 58vh;
+    }
+
+    .video-rescue-actions {
+      margin-top: 10px;
+      display: grid;
+      gap: 8px;
+      grid-template-columns: 1fr;
+    }
+
+    @media (max-width: 640px) {
+      .wrap {
+        width: min(1100px, 95vw);
+        margin: 10px auto 80px;
+        gap: 12px;
+      }
+
+      .card {
+        padding: 14px;
+        border-radius: 18px;
+      }
+
+      .choice-grid { grid-template-columns: 1fr; }
+      .hero-top { grid-template-columns: 58px 1fr; gap: 10px; }
+      .logo-bot { width: 58px; height: 58px; }
+      .offer-pop { right: 10px; left: 10px; width: auto; }
+      .mini-badges { gap: 7px; }
+      .badge { font-size: 11px; }
+    }
+
+    @media (min-width: 760px) {
+      .row.double { grid-template-columns: 1.2fr .8fr; }
+      .cta { grid-template-columns: 1fr 1fr; }
+      .promo-head { grid-template-columns: 1fr auto; }
+      .card {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="card" id="testeCard">
+      <span class="eyebrow">Teste liberado agora</span>
+
+      <div class="hero-top">
+        <img class="logo-bot" src="{{ url_for('static', filename='images/sinal-logo.jpg') }}" alt="Sinal de Esporte Bot">
+        <div>
+          <h1>Teste 4h para voce ja sentir a diferenca</h1>
+          <p class="sub">Configura rapido, testa no seu aparelho e so paga se curtir. Plano completo com bonus de sinais esportivos.</p>
+        </div>
+      </div>
+
+      <div class="mini-badges">
+        <div class="badge">Liberacao rapida</div>
+        <div class="badge">Suporte no WhatsApp</div>
+      </div>
+
+      <form method="post" action="/gerar" class="grid">
+        <div class="row double">
+          <input type="text" name="telefone" value="{{ form_phone }}" placeholder="Seu WhatsApp com DDD (obrigatorio)" required>
+          <button class="btn btn-main" type="submit">Gerar acesso 4 horas</button>
+        </div>
+        <div class="row">
+          <input type="text" name="telegram_id" value="{{ form_telegram_id }}" placeholder="ID do Telegram (opcional para liberacao apos pagamento)">
+        </div>
+      </form>
+
+      {% if result %}
+        <div class="result {{ '' if result.ok else 'bad' }}">
+          <p class="status {{ 'ok' if result.ok else 'err' }}">{{ 'Acesso pronto' if result.ok else 'Nao liberado agora' }}</p>
+          {% if info_msg %}
+            <p class="sub" style="margin-top:6px;">{{ info_msg }}</p>
+          {% endif %}
+          {% if result.ok and basic %}
+            <div class="cred">
+              <div class="pill"><strong>Usuario:</strong> {{ basic.username }}</div>
+              <div class="pill"><strong>Senha:</strong> {{ basic.password }}</div>
+              <div class="pill"><strong>Expira em:</strong> {{ basic.exp_date_brasilia }} (Brasilia)</div>
+            </div>
+          {% else %}
+            <p class="sub" style="margin-top:6px;">{{ error_msg or 'Nao foi possivel gerar agora. Tente novamente em instantes.' }}</p>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <p class="tiny">Se um novo teste nao liberar agora, aguarde a proxima janela e tente novamente.</p>
+    </section>
+
+    <section class="card">
+      <span class="eyebrow">Guia interativo</span>
+      <h2>Oba, vamos instalar os canais na sua TV</h2>
+      <p class="sub">Escolha uma opcao e siga os passos. O guia vai te conduzindo em tempo real.</p>
+      <div class="guide-toolbar">
+        <button type="button" class="guide-voice-btn" id="guideVoiceToggle">Ativar voz do guia</button>
+        <span class="guide-voice-note" id="guideVoiceNote">A voz acompanha o passo a passo conforme voce clica.</span>
+      </div>
+
+      <div class="wizard-box">
+        <div class="chat" id="wizardChat"></div>
+        <div class="choice-grid" id="wizardChoices"></div>
+        <div class="advanced" id="advancedHelp">
+          <h4>Modo avancado (somente se deu erro repetido)</h4>
+          <p>Geralmente TCL resolve no Downloader. Use isso apenas como ultimo recurso.</p>
+          <ul>
+            <li>DNS STB Wplay App: 15.204.233.167</li>
+            <li>DNS STB TV Antiga: 149.56.44.24</li>
+            <li>DNS STB V2: 142.44.232.33</li>
+            <li>DNS STB V3: 104.194.10.27</li>
+            <li>DNS STB V3²: 149.56.45.112</li>
+            <li>Loja de Apps WPlay: <a href="https://loja.zerohop.sbs/" target="_blank" rel="noopener">https://loja.zerohop.sbs/</a></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="promo">
+        <div class="promo-head">
+          <div>
+            <h3>Curtiu o teste? Plano completo por R$ 29,90</h3>
+            <p>Oferta relampago com bonus: sinais de esporte inclusos no pacote.</p>
+          </div>
+          <div class="timer-box">
+            <div class="timer-label">Oferta expira em</div>
+            <div class="timer-val js-offer-time">05:00</div>
+          </div>
+        </div>
+
+        <p><strong>WhatsApp:</strong> 11989346164<br><strong>PIX (CNPJ):</strong> 53453648000180<br><strong>Bonus:</strong> acesso ao <a href="https://t.me/sinalesportesbot" target="_blank" rel="noopener">@sinalesportesbot</a></p>
+
+        <div class="cta">
+          <button class="btn btn-light js-copy-pix" type="button">Copiar PIX CNPJ</button>
+          <a class="btn btn-zap" target="_blank" rel="noopener" href="https://wa.me/5511989346164?text=Testei%20e%20quero%20ativar%20o%20plano%20de%20R%2429%2C90.%20Vou%20enviar%20o%20comprovante.">Enviar comprovante no WhatsApp</a>
+        </div>
+      </div>
+
+      <div class="convocacao">
+        <img id="convocacaoBanner" src="{{ url_for('static', filename='images/convocacao.png') }}" alt="Convocacao brasileira de futebol">
+      </div>
+    </section>
+  </main>
+
+  <aside class="offer-pop" id="offerPop" aria-live="polite">
+    <div class="offer-row">
+      <div class="bolt">⚡</div>
+      <div class="offer-title">Oferta ativa agora: 29,90 + bonus de sinais esportivos</div>
+      <button class="offer-close" id="offerClose" aria-label="Fechar">×</button>
+    </div>
+    <div class="offer-time">Tempo restante: <span class="js-offer-time">05:00</span></div>
+    <div class="offer-actions">
+      <button class="btn-pop btn-pop-copy js-copy-pix" type="button">Copiar PIX CNPJ</button>
+      <a class="btn-pop btn-pop-zap" target="_blank" rel="noopener" href="https://wa.me/5511989346164?text=Quero%20aproveitar%20a%20oferta%20de%2029%2C90%20agora.%20Vou%20mandar%20o%20comprovante.">Falar no WhatsApp agora</a>
+    </div>
+  </aside>
+
+  <div class="video-rescue" id="videoRescue" aria-hidden="true">
+    <div class="video-rescue-card">
+      <button class="video-rescue-close" id="videoRescueClose" aria-label="Fechar">×</button>
+      <h4>⚡ Espera! Antes de desistir, olha esse passo a passo rapido</h4>
+      <p>Assiste esse video e termina em 1 minuto. Se curtir, ativa por R$ 29,90 com bonus de sinais esportivos.</p>
+      <video id="videoRescuePlayer" controls playsinline preload="metadata">
+        <source src="{{ url_for('static', filename='videos/indexhtml.mp4') }}" type="video/mp4">
+      </video>
+      <div class="video-rescue-actions">
+        <button class="btn btn-light" id="videoRescueContinue" type="button">Continuar instalacao</button>
+        <button class="btn btn-light js-copy-pix" type="button">Copiar PIX CNPJ</button>
+        <a class="btn btn-zap" target="_blank" rel="noopener" href="https://wa.me/5511989346164?text=Vi%20o%20video%20de%20instalacao%20e%20quero%20ativar%20o%20plano%20de%2029%2C90.%20Vou%20enviar%20o%20comprovante.">Falar com suporte agora</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const PIX_CNPJ = '53453648000180';
+    const OFFER_WINDOW_SECONDS = 5 * 60;
+    const OFFER_STARTED_KEY = 'wplay_offer_started_at';
+    const OFFER_DISMISS_KEY = 'wplay_offer_dismissed_until';
+
+    const TEST_ACCESS = {
+      username: {{ (basic.username if basic else '') | tojson }},
+      password: {{ (basic.password if basic else '') | tojson }},
+      exp: {{ (basic.exp_date_brasilia if basic else '') | tojson }}
+    };
+
+    function ensureOfferStart() {
+      const now = Date.now();
+      const saved = Number(localStorage.getItem(OFFER_STARTED_KEY) || 0);
+      if (!saved || (now - saved) > OFFER_WINDOW_SECONDS * 1000) {
+        localStorage.setItem(OFFER_STARTED_KEY, String(now));
+        return now;
+      }
+      return saved;
+    }
+
+    function getOfferRemainingSeconds() {
+      const started = ensureOfferStart();
+      const elapsed = Math.floor((Date.now() - started) / 1000);
+      return Math.max(0, OFFER_WINDOW_SECONDS - elapsed);
+    }
+
+    function formatMMSS(seconds) {
+      const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
+      const ss = String(seconds % 60).padStart(2, '0');
+      return `${mm}:${ss}`;
+    }
+
+    function renderOfferTimers() {
+      const remaining = getOfferRemainingSeconds();
+      const nodes = document.querySelectorAll('.js-offer-time');
+      const text = remaining > 0 ? formatMMSS(remaining) : '00:00';
+      nodes.forEach((el) => { el.textContent = text; });
+      return remaining;
+    }
+
+    setInterval(renderOfferTimers, 1000);
+    renderOfferTimers();
+
+    const copyButtons = document.querySelectorAll('.js-copy-pix');
+    copyButtons.forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const original = btn.textContent;
+        try {
+          await navigator.clipboard.writeText(PIX_CNPJ);
+          btn.textContent = 'PIX copiado';
+        } catch (_) {
+          btn.textContent = PIX_CNPJ;
+        }
+        setTimeout(() => { btn.textContent = original; }, 2000);
+      });
+    });
+
+    const offerPop = document.getElementById('offerPop');
+    const offerClose = document.getElementById('offerClose');
+    const videoRescue = document.getElementById('videoRescue');
+    const videoRescuePlayer = document.getElementById('videoRescuePlayer');
+    const videoRescueClose = document.getElementById('videoRescueClose');
+    const videoRescueContinue = document.getElementById('videoRescueContinue');
+    let guideStarted = false;
+    let guideLastInteraction = Date.now();
+    let guideErrorCount = 0;
+    let videoRescueShownCount = 0;
+
+    function registerGuideInteraction() {
+      guideLastInteraction = Date.now();
+    }
+
+    function openVideoRescue(force = false) {
+      if (!force && videoRescueShownCount >= 1) return;
+      if (force && videoRescueShownCount >= 2) return;
+      if (videoRescue.classList.contains('show')) return;
+      videoRescueShownCount += 1;
+      videoRescue.classList.add('show');
+      videoRescue.setAttribute('aria-hidden', 'false');
+      if (videoRescuePlayer) {
+        try {
+          videoRescuePlayer.currentTime = 0;
+          const playPromise = videoRescuePlayer.play();
+          if (playPromise && typeof playPromise.catch === 'function') {
+            playPromise.catch(() => {});
+          }
+        } catch (_) {}
+      }
+    }
+
+    function closeVideoRescue() {
+      videoRescue.classList.remove('show');
+      videoRescue.setAttribute('aria-hidden', 'true');
+      if (videoRescuePlayer) {
+        try { videoRescuePlayer.pause(); } catch (_) {}
+      }
+    }
+
+    function registerGuideError() {
+      guideErrorCount += 1;
+      registerGuideInteraction();
+      if (guideErrorCount >= 2) {
+        openVideoRescue(true);
+      }
+    }
+
+    function mayShowPop() {
+      const until = Number(localStorage.getItem(OFFER_DISMISS_KEY) || 0);
+      return Date.now() > until;
+    }
+
+    function showOfferPop() {
+      if (!mayShowPop()) return;
+      if (getOfferRemainingSeconds() <= 0) return;
+      offerPop.classList.add('show');
+    }
+
+    function hideOfferPop() {
+      offerPop.classList.remove('show');
+      localStorage.setItem(OFFER_DISMISS_KEY, String(Date.now() + 10 * 60 * 1000));
+    }
+
+    setTimeout(showOfferPop, 1200);
+    offerClose.addEventListener('click', hideOfferPop);
+    videoRescueClose.addEventListener('click', closeVideoRescue);
+    videoRescueContinue.addEventListener('click', closeVideoRescue);
+    videoRescue.addEventListener('click', (event) => {
+      if (event.target === videoRescue) closeVideoRescue();
+    });
+
+    setInterval(() => {
+      if (!guideStarted) return;
+      if (document.hidden) return;
+      const idleMs = Date.now() - guideLastInteraction;
+      if (idleMs > 55000) {
+        openVideoRescue(false);
+      }
+    }, 5000);
+
+    const banner = document.getElementById('convocacaoBanner');
+    window.addEventListener('scroll', () => {
+      const y = window.scrollY || 0;
+      const offset = Math.max(-16, Math.min(16, y * -0.03));
+      banner.style.setProperty('--parallax-offset', `${offset}px`);
+    }, { passive: true });
+
+    const chatEl = document.getElementById('wizardChat');
+    const choicesEl = document.getElementById('wizardChoices');
+    const advancedEl = document.getElementById('advancedHelp');
+    const guideVoiceToggle = document.getElementById('guideVoiceToggle');
+    const guideVoiceNote = document.getElementById('guideVoiceNote');
+    const voiceSupported = 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+    let guideVoiceEnabled = false;
+    let guideVoiceUnlocked = false;
+    let guideVoice = null;
+
+    function humanizeTextForSpeech(text) {
+      if (!text) return '';
+      let out = text;
+      out = out.replace(/\b4h\b/gi, '4 horas');
+      out = out.replace(/\bTV\b/gi, 'teve');
+      out = out.replace(/\bTCL\b/gi, 'ti ci el');
+      out = out.replace(/\bPIX\b/gi, 'P I X');
+      out = out.replace(/\bCNPJ\b/gi, 'C N P J');
+      out = out.replace(/\bAPK\b/gi, 'A P K');
+      out = out.replace(/\bWPlay\b/gi, 'u play');
+      out = out.replace(/\bWhatsApp\b/gi, 'uatsap');
+      out = out.replace(/\b(\d{5,})\b/g, (m) => m.split('').join(' '));
+      out = out.replace(/\b([a-zA-Z]+[0-9][a-zA-Z0-9]{2,})\b/g, (m) => m.split('').join(' '));
+      out = out.replace(/\b([0-9]{2}),([0-9]{2})\b/g, '$1 e $2');
+      return out;
+    }
+
+    function plainTextForSpeech(html) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html || '';
+      let text = (tmp.textContent || tmp.innerText || '').trim();
+      text = text.replace(/https?:\/\/\S+/gi, ' link do botao ');
+      text = text.replace(/\s+/g, ' ').trim();
+      return humanizeTextForSpeech(text);
+    }
+
+    function pickGuideVoice() {
+      if (!voiceSupported) return;
+      const voices = window.speechSynthesis.getVoices() || [];
+      if (!voices.length) {
+        guideVoice = null;
+        return;
+      }
+
+      const ptBr = voices.filter((v) => (v.lang || '').toLowerCase().startsWith('pt-br'));
+      const pt = voices.filter((v) => (v.lang || '').toLowerCase().startsWith('pt'));
+      const candidates = ptBr.length ? ptBr : (pt.length ? pt : voices);
+      const mariaMicrosoft = candidates.find((v) => {
+        const name = (v.name || '').toLowerCase();
+        return name.includes('maria') && name.includes('microsoft');
+      });
+      const mariaAny = candidates.find((v) => (v.name || '').toLowerCase().includes('maria'));
+      guideVoice = mariaMicrosoft || mariaAny || null;
+    }
+
+    function splitSpeechText(text, maxLen = 210) {
+      if (!text) return [];
+      const parts = text.match(/[^.!?;:]+[.!?;:]?|[^.!?;:]+/g) || [];
+      const chunks = [];
+      let current = '';
+      parts.forEach((part) => {
+        if (!part) return;
+        if ((current + ' ' + part).trim().length <= maxLen) {
+          current = `${current} ${part}`.trim();
+        } else {
+          if (current) chunks.push(current.trim());
+          if (part.length > maxLen) {
+            const words = part.split(' ');
+            let acc = '';
+            words.forEach((word) => {
+              if ((acc + ' ' + word).trim().length <= maxLen) {
+                acc = `${acc} ${word}`.trim();
+              } else {
+                if (acc) chunks.push(acc.trim());
+                acc = word;
+              }
+            });
+            if (acc) chunks.push(acc.trim());
+            current = '';
+          } else {
+            current = part;
+          }
+        }
+      });
+      if (current) chunks.push(current.trim());
+      return chunks;
+    }
+
+    function speakChunks(chunks, idx = 0) {
+      if (!voiceSupported || !chunks || idx >= chunks.length) return;
+      const segment = chunks[idx];
+      if (!segment) return;
+      const utter = new SpeechSynthesisUtterance(segment);
+      utter.lang = 'pt-BR';
+      if (guideVoice) utter.voice = guideVoice;
+      utter.rate = 0.98;
+      utter.pitch = 1.0;
+      utter.volume = 1;
+      utter.onend = () => speakChunks(chunks, idx + 1);
+      utter.onerror = () => {};
+      window.speechSynthesis.speak(utter);
+    }
+
+    function updateGuideVoiceUi() {
+      if (!voiceSupported) {
+        guideVoiceToggle.textContent = 'Voz indisponivel neste navegador';
+        guideVoiceToggle.disabled = true;
+        guideVoiceToggle.classList.remove('active');
+        guideVoiceNote.textContent = 'Seu navegador nao suporta narracao de voz.';
+        return;
+      }
+      if (!guideVoice) {
+        guideVoiceToggle.textContent = 'Voz Maria nao disponivel';
+        guideVoiceToggle.disabled = true;
+        guideVoiceToggle.classList.remove('active');
+        guideVoiceNote.textContent = 'Esta maquina nao tem a voz Maria da Microsoft. Para usar, abra no Microsoft Edge do Windows.';
+        return;
+      }
+      const currentVoiceName = guideVoice.name || 'Maria Microsoft';
+      if (guideVoiceEnabled) {
+        guideVoiceToggle.textContent = 'Desativar voz do guia';
+        guideVoiceToggle.classList.add('active');
+        guideVoiceNote.textContent = `Narracao ativa com ${currentVoiceName}.`;
+      } else {
+        guideVoiceToggle.textContent = 'Ativar voz do guia';
+        guideVoiceToggle.classList.remove('active');
+        guideVoiceNote.textContent = `Narracao pausada. Voz fixa: ${currentVoiceName}.`;
+      }
+    }
+
+    function unlockGuideVoice(silent = false) {
+      if (!voiceSupported || guideVoiceUnlocked) return;
+      guideVoiceUnlocked = true;
+      pickGuideVoice();
+      if (!guideVoice) return;
+      try {
+        if (!silent) {
+          const unlockUtter = new SpeechSynthesisUtterance('Voz do guia ativada.');
+          unlockUtter.lang = 'pt-BR';
+          if (guideVoice) unlockUtter.voice = guideVoice;
+          unlockUtter.rate = 0.98;
+          unlockUtter.pitch = 1.0;
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(unlockUtter);
+        }
+      } catch (_) {}
+    }
+
+    function speakGuide(text) {
+      if (!voiceSupported || !guideVoiceEnabled || !guideVoiceUnlocked || !guideVoice) return;
+      const content = plainTextForSpeech(text);
+      if (!content) return;
+      try {
+        window.speechSynthesis.cancel();
+        speakChunks(splitSpeechText(content));
+      } catch (_) {}
+    }
+
+    if (voiceSupported) {
+      pickGuideVoice();
+      if (typeof window.speechSynthesis.addEventListener === 'function') {
+        window.speechSynthesis.addEventListener('voiceschanged', () => {
+          pickGuideVoice();
+          updateGuideVoiceUi();
+        });
+      } else {
+        window.speechSynthesis.onvoiceschanged = () => {
+          pickGuideVoice();
+          updateGuideVoiceUi();
+        };
+      }
+    }
+
+    guideVoiceToggle.addEventListener('click', () => {
+      if (!voiceSupported || !guideVoice) return;
+      if (!guideVoiceUnlocked) unlockGuideVoice();
+      guideVoiceEnabled = !guideVoiceEnabled;
+      if (!guideVoiceEnabled) {
+        try { window.speechSynthesis.cancel(); } catch (_) {}
+      } else {
+        speakGuide('Narracao do guia reativada.');
+      }
+      updateGuideVoiceUi();
+    });
+
+    updateGuideVoiceUi();
+
+    function addBubble(text, who = 'bot') {
+      const div = document.createElement('div');
+      div.className = 'bubble ' + who;
+      div.innerHTML = text;
+      chatEl.appendChild(div);
+      chatEl.scrollTop = chatEl.scrollHeight;
+      if (who === 'bot') {
+        speakGuide(text);
+      }
+    }
+
+    function setChoices(options) {
+      choicesEl.innerHTML = '';
+      options.forEach((opt) => {
+        if (opt.href) {
+          const link = document.createElement('a');
+          link.className = 'choice-btn';
+          link.target = '_blank';
+          link.rel = 'noopener';
+          link.href = opt.href;
+          link.textContent = opt.label;
+          choicesEl.appendChild(link);
+          return;
+        }
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'choice-btn';
+        btn.textContent = opt.label;
+        btn.addEventListener('click', () => {
+          if (voiceSupported && guideVoice && !guideVoiceUnlocked) {
+            unlockGuideVoice();
+            guideVoiceEnabled = true;
+            updateGuideVoiceUi();
+          }
+          registerGuideInteraction();
+          addBubble(opt.label, 'user');
+          opt.onClick();
+        });
+        choicesEl.appendChild(btn);
+      });
+    }
+
+    function goToGenerateForm() {
+      const target = document.getElementById('testeCard');
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const phoneInput = document.querySelector('input[name="telefone"]');
+      if (phoneInput) setTimeout(() => phoneInput.focus(), 350);
+    }
+
+    function credentialBlock() {
+      if (TEST_ACCESS.username && TEST_ACCESS.password) {
+        return `
+          <strong>Oba, percebi que deu certo. Agora use este acesso do seu teste de 4h:</strong>
+          <ul>
+            <li>Usuario: <b>${TEST_ACCESS.username}</b></li>
+            <li>Senha: <b>${TEST_ACCESS.password}</b></li>
+            <li>Validade: <b>${TEST_ACCESS.exp || '4 horas'}</b></li>
+          </ul>
+        `;
+      }
+      return `
+        <strong>Quase la:</strong>
+        <ul>
+          <li>Toque em <b>Liberar teste agora</b> e eu ja uso esse acesso aqui no guia.</li>
+        </ul>
+      `;
+    }
+
+    function finishInstall() {
+      addBubble(credentialBlock(), 'bot');
+
+      const actions = [];
+      if (!TEST_ACCESS.username || !TEST_ACCESS.password) {
+        actions.push({ label: 'Liberar teste agora', onClick: goToGenerateForm });
+      }
+
+      actions.push(
+        {
+          label: 'Copiar PIX e ativar plano',
+          onClick: () => {
+            navigator.clipboard.writeText(PIX_CNPJ).catch(() => {});
+            addBubble('PIX copiado. Envie o comprovante no WhatsApp 11989346164 e liberamos seu plano premium.', 'bot');
+            setChoices([
+              { label: 'Enviar comprovante no WhatsApp', href: 'https://wa.me/5511989346164?text=Quero%20ativar%20o%20plano%20de%2029%2C90%20com%20bonus%20de%20sinais.%20Vou%20enviar%20o%20comprovante.' },
+              { label: 'Reiniciar guia', onClick: startGuide }
+            ]);
+          }
+        },
+        { label: 'Reiniciar guia', onClick: startGuide }
+      );
+
+      setChoices(actions);
+    }
+
+    function showAdvancedHelp() {
+      registerGuideError();
+      advancedEl.style.display = 'block';
+      addBubble('Tudo bem, modo avancado liberado abaixo. Se preferir, eu te conecto no suporte agora no WhatsApp.', 'bot');
+      setChoices([
+        { label: 'Chamar suporte no WhatsApp', href: 'https://wa.me/5511989346164?text=Preciso%20de%20ajuda%20na%20instalacao%20da%20TV.' },
+        { label: 'Tentar codigo 3964281 novamente', onClick: tclCodeStep }
+      ]);
+    }
+
+    function tclCodeStep() {
+      addBubble('Oba, percebi que voce ja baixou. Agora abra o Downloader e digite <b>3964281</b>.', 'bot');
+      setChoices([
+        { label: 'Instalei com sucesso', onClick: finishInstall },
+        {
+          label: 'Deu erro',
+          onClick: () => {
+            registerGuideError();
+            addBubble('Isso e comum. TVs atuais pedem permissao para apps desconhecidos. Ative essa permissao e tente de novo.', 'bot');
+            setChoices([
+              { label: 'Permiti e funcionou', onClick: finishInstall },
+              { label: 'Ainda com erro', onClick: showAdvancedHelp }
+            ]);
+          }
+        }
+      ]);
+    }
+
+    function tclFlow() {
+      addBubble('Oba, vi que voce escolheu TV TCL. Entao e facil: abra a Play Store da TV e baixe o app <b>Downloader</b>.', 'bot');
+      setChoices([
+        { label: 'Ja baixei', onClick: tclCodeStep },
+        {
+          label: 'Ainda nao baixei',
+          onClick: () => {
+            addBubble('Perfeito. Baixe o Downloader e depois toque em "Ja baixei" para continuar.', 'bot');
+            setChoices([
+              { label: 'Ja baixei', onClick: tclCodeStep },
+              { label: 'Reiniciar guia', onClick: startGuide }
+            ]);
+          }
+        }
+      ]);
+    }
+
+    function tvStoreFlow(brandName) {
+      addBubble(`Show. Para ${brandName}, procure o app <b>Wapp</b> na loja oficial da TV e instale.`, 'bot');
+      setChoices([
+        { label: 'Instalei', onClick: finishInstall },
+        {
+          label: 'Nao achei / deu erro',
+          onClick: () => {
+            addBubble('Sem problema, vamos pelo metodo mais facil com Downloader.', 'bot');
+            tclFlow();
+          }
+        }
+      ]);
+    }
+
+    function tvFlow() {
+      addBubble('Qual marca da sua TV?', 'bot');
+      setChoices([
+        { label: 'TCL', onClick: tclFlow },
+        { label: 'LG', onClick: () => tvStoreFlow('LG') },
+        { label: 'Samsung', onClick: () => tvStoreFlow('Samsung') },
+        { label: 'Roku', onClick: () => tvStoreFlow('Roku') },
+        {
+          label: 'Outra marca',
+          onClick: () => {
+            addBubble('Ela e Android TV?', 'bot');
+            setChoices([
+              { label: 'Sim, e Android', onClick: tclFlow },
+              { label: 'Nao sei / nao e', onClick: showAdvancedHelp }
+            ]);
+          }
+        }
+      ]);
+    }
+
+    function celularFlow() {
+      addBubble('Seu celular e Android ou iPhone?', 'bot');
+      setChoices([
+        {
+          label: 'Android',
+          onClick: () => {
+            addBubble('Android: instale direto por este link oficial do app:', 'bot');
+            addBubble('<a target="_blank" rel="noopener" href="https://loja.zerohop.sbs/control/actions/aplicativos/WPlay%20P2P%20BinStream.apk">https://loja.zerohop.sbs/control/actions/aplicativos/WPlay%20P2P%20BinStream.apk</a>', 'bot');
+            setChoices([
+              { label: 'Instalei no Android', onClick: finishInstall },
+              { label: 'Deu erro', onClick: showAdvancedHelp }
+            ]);
+          }
+        },
+        {
+          label: 'iPhone',
+          onClick: () => {
+            addBubble('iPhone: instale direto neste link da App Store:', 'bot');
+            addBubble('<a target="_blank" rel="noopener" href="https://apps.apple.com/br/app/wplay-mobile/id6471241842">https://apps.apple.com/br/app/wplay-mobile/id6471241842</a>', 'bot');
+            setChoices([
+              { label: 'Instalei no iPhone', onClick: finishInstall },
+              { label: 'Reiniciar guia', onClick: startGuide }
+            ]);
+          }
+        }
+      ]);
+    }
+
+    function notebookFlow() {
+      addBubble('Seu notebook e Windows ou Macbook?', 'bot');
+      setChoices([
+        {
+          label: 'Windows',
+          onClick: () => {
+            addBubble('Windows: baixe por um destes links:<br><a target="_blank" rel="noopener" href="https://rebrand.ly/5dee47">Opcao 1</a> | <a target="_blank" rel="noopener" href="https://rebrand.ly/2ce548">Opcao 2</a>', 'bot');
+            setChoices([
+              { label: 'Instalei no Windows', onClick: finishInstall },
+              { label: 'Reiniciar guia', onClick: startGuide }
+            ]);
+          }
+        },
+        {
+          label: 'Macbook',
+          onClick: () => {
+            addBubble('Macbook: baixe aqui <a target="_blank" rel="noopener" href="https://rebrand.ly/c73dfc">app MacOS</a>.', 'bot');
+            setChoices([
+              { label: 'Instalei no Macbook', onClick: finishInstall },
+              { label: 'Reiniciar guia', onClick: startGuide }
+            ]);
+          }
+        }
+      ]);
+    }
+
+    function startGuide() {
+      advancedEl.style.display = 'none';
+      chatEl.innerHTML = '';
+      guideStarted = true;
+      guideErrorCount = 0;
+      registerGuideInteraction();
+      addBubble('Oba, vamos instalar os canais na sua tela agora. Onde voce quer usar primeiro?', 'bot');
+      if (TEST_ACCESS.username && TEST_ACCESS.password) {
+        addBubble(`Ja deixei separado seu acesso desta sessao:<br><b>Usuario:</b> ${TEST_ACCESS.username}<br><b>Senha:</b> ${TEST_ACCESS.password}`, 'bot');
+      }
+      setChoices([
+        { label: 'TV', onClick: tvFlow },
+        { label: 'Celular', onClick: celularFlow },
+        { label: 'Notebook', onClick: notebookFlow }
+      ]);
+    }
+
+    startGuide();
+  </script>
+</body>
+</html>
+
