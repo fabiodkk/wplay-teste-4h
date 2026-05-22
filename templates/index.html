@@ -1103,10 +1103,10 @@
           </div>
         </div>
 
-        <p><strong>WhatsApp:</strong> 11989346164<br><strong>PIX (CNPJ):</strong> 53453648000180<br><strong>Bonus:</strong> acesso ao <a href="https://t.me/sinalesportesbot" target="_blank" rel="noopener">@sinalesportesbot</a></p>
+        <p><strong>WhatsApp:</strong> 11989346164<br><strong>PIX:</strong> toque em <b>Copiar PIX</b> para usar a chave no pagamento.<br><strong>Bonus:</strong> acesso ao <a href="https://t.me/sinalesportesbot" target="_blank" rel="noopener">@sinalesportesbot</a></p>
 
         <div class="cta">
-          <button class="btn btn-light js-copy-pix" type="button">Copiar PIX CNPJ</button>
+          <button class="btn btn-light js-copy-pix" type="button">Copiar PIX</button>
           <a class="btn btn-zap" target="_blank" rel="noopener" href="https://wa.me/5511989346164?text=Testei%20e%20quero%20ativar%20o%20plano%20de%20R%2429%2C90.%20Vou%20enviar%20o%20comprovante.">Enviar comprovante no WhatsApp</a>
         </div>
       </div>
@@ -1230,7 +1230,7 @@
     </div>
     <div class="offer-time">Tempo restante: <span class="js-offer-time">05:00</span></div>
     <div class="offer-actions">
-      <button class="btn-pop btn-pop-copy js-copy-pix" type="button">Copiar PIX CNPJ</button>
+      <button class="btn-pop btn-pop-copy js-copy-pix" type="button">Copiar PIX</button>
       <a class="btn-pop btn-pop-zap" target="_blank" rel="noopener" href="https://wa.me/5511989346164?text=Quero%20aproveitar%20a%20oferta%20de%2029%2C90%20agora.%20Vou%20mandar%20o%20comprovante.">Falar no WhatsApp agora</a>
     </div>
   </aside>
@@ -1245,7 +1245,7 @@
       </video>
       <div class="video-rescue-actions">
         <button class="btn btn-light" id="videoRescueContinue" type="button">Continuar instalacao</button>
-        <button class="btn btn-light js-copy-pix" type="button">Copiar PIX CNPJ</button>
+        <button class="btn btn-light js-copy-pix" type="button">Copiar PIX</button>
         <a class="btn btn-zap" target="_blank" rel="noopener" href="https://wa.me/5511989346164?text=Vi%20o%20video%20de%20instalacao%20e%20quero%20ativar%20o%20plano%20de%2029%2C90.%20Vou%20enviar%20o%20comprovante.">Falar com suporte agora</a>
       </div>
     </div>
@@ -1306,7 +1306,7 @@
           await navigator.clipboard.writeText(PIX_CNPJ);
           btn.textContent = 'PIX copiado';
         } catch (_) {
-          btn.textContent = PIX_CNPJ;
+          btn.textContent = 'Nao foi possivel copiar';
         }
         setTimeout(() => { btn.textContent = original; }, 2000);
       });
