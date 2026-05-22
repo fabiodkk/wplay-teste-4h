@@ -10,3 +10,7 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
+      - key: TMDB_BEARER_TOKEN
+        value: eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJmMGU2ZDExZDllZTg3N2ViZTgyNTFiYmJiMzE3OGI1NSIsIm5iZiI6MTc3OTQwOTk0Mi4wODgsInN1YiI6IjZhMGZhNDE2MTZjNmUzYmIyMTIzNGZmNCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.C2DLCX9AxO1MjTHlEXTJBGgMwZHEgDpFoT7ARGRSZLg
+      - key: TMDB_API_KEY
+        value: f0e6d11d9ee877ebe8251bbbb3178b55

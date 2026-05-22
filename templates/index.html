@@ -631,6 +631,12 @@
       min-width: 0;
     }
 
+    .vitrine-search-row {
+      display: flex;
+      justify-content: flex-end;
+      margin: 0 2px 8px;
+    }
+
     .vitrine-search-btn {
       border: 1px solid rgba(110, 231, 255, .52);
       background: linear-gradient(140deg, rgba(8, 51, 79, .95), rgba(7, 88, 117, .92));
@@ -993,6 +999,7 @@
       .badge { font-size: 11px; }
       .vitrine-row-head { flex-wrap: wrap; }
       .vitrine-search { width: 100%; }
+      .vitrine-search-row { margin-bottom: 6px; }
     }
 
     @media (min-width: 760px) {
@@ -1148,6 +1155,8 @@
           <div>
             <div class="vitrine-row-head">
               <p class="vitrine-row-title">Nao encontrou? Solicite agora</p>
+            </div>
+            <div class="vitrine-search-row">
               <div class="vitrine-search">
                 <input
                   class="vitrine-search-input"
