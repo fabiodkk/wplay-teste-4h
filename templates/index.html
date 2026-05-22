@@ -593,22 +593,49 @@
       filter: brightness(1.08);
     }
 
-    .vitrine-viewport {
+    .vitrine-stack {
       margin-top: 10px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .vitrine-row-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+      padding: 0 2px;
+    }
+
+    .vitrine-row-title {
+      margin: 0;
+      font-size: 11px;
+      color: #bfe9ff;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      font-weight: 800;
+    }
+
+    .vitrine-viewport {
       border-radius: 12px;
       overflow: hidden;
       border: 1px solid rgba(255, 255, 255, .12);
       background: rgba(2, 12, 22, .64);
-      mask-image: linear-gradient(to right, transparent 0, black 6%, black 94%, transparent 100%);
-      -webkit-mask-image: linear-gradient(to right, transparent 0, black 6%, black 94%, transparent 100%);
+      mask-image: linear-gradient(to right, transparent 0, black 5%, black 95%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to right, transparent 0, black 5%, black 95%, transparent 100%);
     }
 
     .vitrine-track {
       display: flex;
-      gap: 10px;
+      gap: 12px;
       width: max-content;
-      padding: 10px;
-      animation: vitrine-marquee 42s linear infinite;
+      padding: 12px;
+      animation: vitrine-marquee 46s linear infinite;
+    }
+
+    .vitrine-track.fast {
+      animation-duration: 36s;
     }
 
     .vitrine:hover .vitrine-track {
@@ -616,7 +643,7 @@
     }
 
     .vitrine-card {
-      width: clamp(146px, 34vw, 200px);
+      width: clamp(178px, 38vw, 258px);
       border-radius: 12px;
       overflow: hidden;
       border: 1px solid rgba(255, 255, 255, .18);
@@ -628,17 +655,31 @@
 
     .vitrine-card img {
       width: 100%;
-      height: 112px;
+      height: clamp(124px, 20vw, 150px);
       object-fit: cover;
       display: block;
       filter: saturate(1.08) contrast(1.05);
     }
 
     .vitrine-meta {
-      padding: 8px;
+      padding: 9px;
       background: linear-gradient(165deg, rgba(4, 19, 33, .95), rgba(6, 31, 49, .92));
       display: grid;
-      gap: 6px;
+      gap: 7px;
+    }
+
+    .vitrine-card-title {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.25;
+      font-weight: 700;
+      color: #ebf8ff;
+      min-height: 30px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .vitrine-tag {
@@ -652,26 +693,47 @@
       border-radius: 999px;
       padding: 4px 7px;
       width: fit-content;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    .vitrine-logos {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
+    .vitrine-action {
+      border: 1px solid rgba(245, 158, 11, .6);
+      background: linear-gradient(140deg, rgba(251, 191, 36, .9), rgba(249, 115, 22, .88));
+      color: #2c1900;
+      border-radius: 9px;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 7px 8px;
+      cursor: pointer;
+      transition: transform .2s ease, filter .2s ease;
     }
 
-    .vitrine-logos img {
-      width: 20px;
-      height: 20px;
-      object-fit: contain;
-      border-radius: 6px;
-      background: rgba(255, 255, 255, .92);
-      border: 1px solid rgba(255, 255, 255, .26);
-      padding: 2px;
+    .vitrine-action:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.06);
     }
+
+    .vitrine-action[disabled] {
+      opacity: .7;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .vitrine-action-status {
+      margin: 0;
+      font-size: 11px;
+      color: #b9d9ed;
+      line-height: 1.25;
+    }
+
+    .vitrine-action-status.ok { color: #8eeab9; }
+    .vitrine-action-status.err { color: #fecaca; }
 
     .vitrine.collapsed .vitrine-sub,
-    .vitrine.collapsed .vitrine-viewport {
+    .vitrine.collapsed .vitrine-stack {
       display: none;
     }
 
@@ -993,66 +1055,94 @@
           <button class="vitrine-toggle" id="vitrineToggle" type="button" aria-expanded="true">Minimizar</button>
         </div>
         <p class="vitrine-sub">Veja um gostinho do catalogo: HBO, Disney, infantil, noticias, series e esportes ao vivo.</p>
-        <div class="vitrine-viewport">
-          <div class="vitrine-track" id="vitrineTrack">
-            {% if recent_media %}
-              {% for item in recent_media %}
-                <article class="vitrine-card">
-                  <img src="{{ item.cover or item.backdrop or 'https://images.unsplash.com/photo-1505238680356-667803448bb6?auto=format&fit=crop&w=900&q=80' }}" alt="{{ item.title or 'Conteudo recente' }}">
-                  <div class="vitrine-meta">
-                    <span class="vitrine-tag">{{ item.kind_label }}{% if item.added %} • {{ item.added }}{% endif %}</span>
-                  </div>
-                </article>
-              {% endfor %}
-            {% else %}
-              <article class="vitrine-card">
-                <img src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=900&q=80" alt="Cartaz de filme em destaque">
-                <div class="vitrine-meta">
-                  <span class="vitrine-tag">Filmes em destaque</span>
-                  <div class="vitrine-logos">
-                    <img src="https://img.icons8.com/color/48/hbo.png" alt="HBO">
-                    <img src="https://img.icons8.com/color/48/netflix.png" alt="Netflix">
-                    <img src="https://img.icons8.com/color/48/disney-logo.png" alt="Disney">
-                  </div>
-                </div>
-              </article>
+        <div class="vitrine-stack">
+          <div>
+            <div class="vitrine-row-head">
+              <p class="vitrine-row-title">Entradas recentes do catalogo</p>
+            </div>
+            <div class="vitrine-viewport">
+              <div class="vitrine-track" id="vitrineTrackRecent" data-loop="true">
+                {% if recent_media %}
+                  {% for item in recent_media %}
+                    <article class="vitrine-card">
+                      <img src="{{ item.cover or item.backdrop or 'https://images.unsplash.com/photo-1505238680356-667803448bb6?auto=format&fit=crop&w=900&q=80' }}" alt="{{ item.title or 'Conteudo recente' }}">
+                      <div class="vitrine-meta">
+                        <p class="vitrine-card-title">{{ item.title or 'Conteudo recente' }}</p>
+                        <span class="vitrine-tag">{{ item.kind_label }}{% if item.added %} • {{ item.added }}{% endif %}</span>
+                      </div>
+                    </article>
+                  {% endfor %}
+                {% else %}
+                  <article class="vitrine-card">
+                    <img src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=900&q=80" alt="Cartaz de filme em destaque">
+                    <div class="vitrine-meta">
+                      <p class="vitrine-card-title">Filmes em destaque</p>
+                      <span class="vitrine-tag">Filmes premium</span>
+                    </div>
+                  </article>
+                  <article class="vitrine-card">
+                    <img src="https://images.unsplash.com/photo-1511886929837-354d827aae26?auto=format&fit=crop&w=900&q=80" alt="Esportes ao vivo em alta">
+                    <div class="vitrine-meta">
+                      <p class="vitrine-card-title">Esportes ao vivo</p>
+                      <span class="vitrine-tag">Canais ao vivo</span>
+                    </div>
+                  </article>
+                {% endif %}
+              </div>
+            </div>
+          </div>
 
-              <article class="vitrine-card">
-                <img src="https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=900&q=80" alt="Cinema premium em casa">
-                <div class="vitrine-meta">
-                  <span class="vitrine-tag">Series premium</span>
-                  <div class="vitrine-logos">
-                    <img src="https://img.icons8.com/color/48/hulu.png" alt="Hulu">
-                    <img src="https://img.icons8.com/color/48/netflix.png" alt="Netflix">
-                    <img src="https://img.icons8.com/color/48/hbo.png" alt="HBO">
-                  </div>
-                </div>
-              </article>
-
-              <article class="vitrine-card">
-                <img src="https://images.unsplash.com/photo-1511886929837-354d827aae26?auto=format&fit=crop&w=900&q=80" alt="Estadio lotado para futebol ao vivo">
-                <div class="vitrine-meta">
-                  <span class="vitrine-tag">Esportes ao vivo</span>
-                  <div class="vitrine-logos">
-                    <img src="https://img.icons8.com/color/48/espn.png" alt="ESPN">
-                    <img src="https://img.icons8.com/color/48/football2.png" alt="Futebol">
-                    <img src="https://img.icons8.com/color/48/cnn.png" alt="Noticias">
-                  </div>
-                </div>
-              </article>
-
-              <article class="vitrine-card">
-                <img src="https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?auto=format&fit=crop&w=900&q=80" alt="Programacao infantil colorida">
-                <div class="vitrine-meta">
-                  <span class="vitrine-tag">Infantil e familia</span>
-                  <div class="vitrine-logos">
-                    <img src="https://img.icons8.com/color/48/nickelodeon.png" alt="Nickelodeon">
-                    <img src="https://img.icons8.com/color/48/disney-logo.png" alt="Disney">
-                    <img src="https://img.icons8.com/color/48/youtube-play.png" alt="YouTube">
-                  </div>
-                </div>
-              </article>
-            {% endif %}
+          <div>
+            <div class="vitrine-row-head">
+              <p class="vitrine-row-title">Nao encontrou? Solicite agora</p>
+            </div>
+            <div class="vitrine-viewport">
+              <div class="vitrine-track fast" id="vitrineTrackPedidos" data-loop="true">
+                {% if request_media %}
+                  {% for item in request_media %}
+                    <article class="vitrine-card">
+                      <img src="{{ item.cover or item.backdrop or 'https://images.unsplash.com/photo-1505238680356-667803448bb6?auto=format&fit=crop&w=900&q=80' }}" alt="{{ item.title or 'Sugestao de conteudo' }}">
+                      <div class="vitrine-meta">
+                        <p class="vitrine-card-title">{{ item.title or 'Sugestao de conteudo' }}</p>
+                        <span class="vitrine-tag">{{ item.kind_label }}{% if item.added %} • {{ item.added }}{% endif %}</span>
+                        {% if item.can_request %}
+                          <button
+                            class="vitrine-action js-pedir-conteudo"
+                            type="button"
+                            data-title="{{ item.title or '' }}"
+                            data-content-type="{{ item.request_content_type or 'filme' }}"
+                            data-tmdb-id="{{ item.tmdb_id or '' }}"
+                            data-img-url="{{ item.cover or item.backdrop or '' }}"
+                            data-user-id="{{ request_user_id or '' }}"
+                          >Pedir</button>
+                          <p class="vitrine-action-status" aria-live="polite"></p>
+                        {% else %}
+                          <p class="vitrine-action-status">Ja disponivel no catalogo</p>
+                        {% endif %}
+                      </div>
+                    </article>
+                  {% endfor %}
+                {% else %}
+                  <article class="vitrine-card">
+                    <img src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=900&q=80" alt="Sugestao de filme">
+                    <div class="vitrine-meta">
+                      <p class="vitrine-card-title">Jurassic World: O Mundo dos Dinossauros</p>
+                      <span class="vitrine-tag">Filme sugerido</span>
+                      <button
+                        class="vitrine-action js-pedir-conteudo"
+                        type="button"
+                        data-title="Jurassic World: O Mundo dos Dinossauros"
+                        data-content-type="filme"
+                        data-tmdb-id="135397"
+                        data-img-url=""
+                        data-user-id="{{ request_user_id or '' }}"
+                      >Pedir</button>
+                      <p class="vitrine-action-status" aria-live="polite"></p>
+                    </div>
+                  </article>
+                {% endif %}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1099,6 +1189,7 @@
       password: {{ (basic.password if basic else '') | tojson }},
       exp: {{ (basic.exp_date_brasilia if basic else '') | tojson }}
     };
+    const REQUEST_USER_ID = {{ (request_user_id or '') | tojson }};
 
     function ensureOfferStart() {
       const now = Date.now();
@@ -1230,12 +1321,14 @@
     }, 5000);
 
     const vitrine = document.getElementById('vitrineMidia');
-    const vitrineTrack = document.getElementById('vitrineTrack');
     const vitrineToggle = document.getElementById('vitrineToggle');
 
-    if (vitrineTrack) {
-      vitrineTrack.innerHTML += vitrineTrack.innerHTML;
-    }
+    document.querySelectorAll('.vitrine-track[data-loop="true"]').forEach((track) => {
+      if (track.dataset.cloned === '1') return;
+      if (!track.children.length) return;
+      track.innerHTML += track.innerHTML;
+      track.dataset.cloned = '1';
+    });
 
     if (vitrine && vitrineToggle) {
       vitrineToggle.addEventListener('click', () => {
@@ -1244,6 +1337,72 @@
         vitrineToggle.setAttribute('aria-expanded', String(!collapsed));
       });
     }
+
+    function normalizeRequestStatus(statusText) {
+      const safe = (statusText || '').toLowerCase();
+      if (safe.includes('pendente') || safe.includes('analise') || safe.includes('análise')) return 'ok';
+      return 'err';
+    }
+
+    document.querySelectorAll('.js-pedir-conteudo').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const statusEl = btn.parentElement ? btn.parentElement.querySelector('.vitrine-action-status') : null;
+        const payload = {
+          content_name: (btn.dataset.title || '').trim(),
+          content_type: (btn.dataset.contentType || 'filme').trim(),
+          tmdb_id: (btn.dataset.tmdbId || '').trim(),
+          img_url: (btn.dataset.imgUrl || '').trim(),
+          user_id: (btn.dataset.userId || REQUEST_USER_ID || '').trim()
+        };
+        if (!payload.content_name) {
+          if (statusEl) {
+            statusEl.className = 'vitrine-action-status err';
+            statusEl.textContent = 'Nao foi possivel enviar este pedido.';
+          }
+          return;
+        }
+
+        const originalLabel = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Enviando...';
+        if (statusEl) {
+          statusEl.className = 'vitrine-action-status';
+          statusEl.textContent = 'Enviando pedido...';
+        }
+
+        try {
+          const resp = await fetch('/api/pedir-conteudo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const data = await resp.json().catch(() => ({}));
+          const apiResp = data && typeof data === 'object' ? (data.response || data) : {};
+          const statusText = apiResp.status || (data.ok ? 'pendente' : 'erro');
+          const requestId = apiResp.content_request_id || apiResp._id || '';
+          const statusClass = normalizeRequestStatus(statusText);
+          if (statusEl) {
+            statusEl.className = `vitrine-action-status ${statusClass}`;
+            statusEl.textContent = requestId
+              ? `Pedido em analise (${requestId}).`
+              : `Pedido em analise para ${payload.content_name}.`;
+          }
+          if (!resp.ok || !data.ok) {
+            btn.disabled = false;
+            btn.textContent = originalLabel;
+            return;
+          }
+          btn.textContent = 'Pedido enviado';
+        } catch (_) {
+          if (statusEl) {
+            statusEl.className = 'vitrine-action-status err';
+            statusEl.textContent = 'Falha ao enviar agora. Tente novamente.';
+          }
+          btn.disabled = false;
+          btn.textContent = originalLabel;
+        }
+      });
+    });
 
     const chatEl = document.getElementById('wizardChat');
     const choicesEl = document.getElementById('wizardChoices');

@@ -5,12 +5,14 @@ from flask import Flask, render_template, request
 from automate_mcapi import (
     add_ip_liberado,
     check_ip_limits,
+    fetch_catalog_request_tracks_for_user,
     fetch_recent_streams_for_user,
     generate_access_once,
     get_active_access_for_ip,
     list_ip_liberados,
     register_usuario_criado_ip,
     remove_ip_liberado,
+    submit_content_request_for_user,
 )
 
 app = Flask(__name__)
@@ -80,6 +82,31 @@ def safe_recent_media(req, client_ip: str):
     }
 
 
+def safe_request_media(req, client_ip: str):
+    bearer = extract_bearer_from_request(req)
+    preferred_user_id = (req.args.get("user_id") or req.headers.get("X-Mcapi-User-Id") or "").strip()
+    try:
+        result = fetch_catalog_request_tracks_for_user(
+            provided_bearer=bearer,
+            preferred_user_id=preferred_user_id,
+            search_query="ss",
+            findall_limit=14,
+            tmdb_limit=14,
+            merged_limit=18,
+            client_ip=client_ip,
+            allow_shared_fallback=True,
+        )
+    except Exception:
+        return {"items": [], "ok": False, "token_source": "error", "user_id": preferred_user_id}
+
+    return {
+        "items": result.get("merged_items", [])[:18],
+        "ok": bool(result.get("ok")),
+        "token_source": result.get("token_source", "none"),
+        "user_id": result.get("user_id") or preferred_user_id,
+    }
+
+
 def render_liberados(status_msg="", is_error=False):
     client_ip = get_client_ip(request)
     rows = list_ip_liberados()
@@ -97,6 +124,7 @@ def index():
     client_ip = get_client_ip(request)
     limit_info = safe_check_ip_limits(client_ip)
     recent_media = safe_recent_media(request, client_ip)
+    request_media = safe_request_media(request, client_ip)
     return render_template(
         "index.html",
         result=None,
@@ -104,6 +132,8 @@ def index():
         client_ip=client_ip,
         limit_info=limit_info,
         recent_media=recent_media["items"],
+        request_media=request_media["items"],
+        request_user_id=request_media.get("user_id", ""),
         error_msg="",
         info_msg="",
         form_phone="",
@@ -115,6 +145,7 @@ def index():
 def gerar():
     client_ip = get_client_ip(request)
     recent_media = safe_recent_media(request, client_ip)
+    request_media = safe_request_media(request, client_ip)
     telefone = (request.form.get("telefone") or "").strip()
     telegram_id = (request.form.get("telegram_id") or "").strip()
 
@@ -126,6 +157,8 @@ def gerar():
             client_ip=client_ip,
             limit_info=safe_check_ip_limits(client_ip),
             recent_media=recent_media["items"],
+            request_media=request_media["items"],
+            request_user_id=request_media.get("user_id", ""),
             error_msg="Para liberar seu teste, informe um WhatsApp valido.",
             info_msg="",
             form_phone=telefone,
@@ -153,6 +186,8 @@ def gerar():
             client_ip=client_ip,
             limit_info=safe_check_ip_limits(client_ip),
             recent_media=recent_media["items"],
+            request_media=request_media["items"],
+            request_user_id=request_media.get("user_id", ""),
             error_msg="",
             info_msg="Seu teste atual ainda esta ativo. Reapresentamos o mesmo acesso para voce continuar.",
             form_phone=telefone,
@@ -169,6 +204,8 @@ def gerar():
             client_ip=client_ip,
             limit_info=limit_info,
             recent_media=recent_media["items"],
+            request_media=request_media["items"],
+            request_user_id=request_media.get("user_id", ""),
             error_msg="Seu teste ja foi gerado recentemente. Assim que liberar novamente, voce consegue gerar de novo.",
             info_msg="",
             form_phone=telefone,
@@ -198,6 +235,8 @@ def gerar():
         client_ip=client_ip,
         limit_info=limit_info,
         recent_media=recent_media["items"],
+        request_media=request_media["items"],
+        request_user_id=request_media.get("user_id", ""),
         error_msg=error_msg,
         info_msg=info_msg,
         form_phone=telefone,
@@ -224,6 +263,42 @@ def api_recentes():
         allow_shared_fallback=True,
     )
     status_code = 200 if result.get("ok") else 400
+    return result, status_code
+
+
+@app.post("/api/pedir-conteudo")
+def api_pedir_conteudo():
+    client_ip = get_client_ip(request)
+    bearer = extract_bearer_from_request(request)
+    preferred_user_id = (request.args.get("user_id") or request.headers.get("X-Mcapi-User-Id") or "").strip()
+
+    payload = request.get_json(silent=True) or {}
+    content_name = (payload.get("content_name") or request.form.get("content_name") or "").strip()
+    content_type = (payload.get("content_type") or request.form.get("content_type") or "filme").strip().lower()
+    tmdb_id = (payload.get("tmdb_id") or request.form.get("tmdb_id") or "").strip()
+    img_url = (payload.get("img_url") or request.form.get("img_url") or "").strip()
+    user_id = (payload.get("user_id") or request.form.get("user_id") or "").strip()
+
+    if not content_name:
+        return {"ok": False, "error": "Informe o nome do conteudo para solicitar."}, 400
+
+    if content_type not in {"filme", "serie", "canal"}:
+        content_type = "filme"
+
+    result = submit_content_request_for_user(
+        provided_bearer=bearer,
+        preferred_user_id=preferred_user_id,
+        content_name=content_name,
+        content_type=content_type,
+        tmdb_id=tmdb_id,
+        img_url=img_url,
+        user_id=user_id,
+        client_ip=client_ip,
+        allow_shared_fallback=True,
+    )
+    status_code = result.get("status_code") if isinstance(result.get("status_code"), int) else None
+    if status_code is None:
+        status_code = 200 if result.get("ok") else 400
     return result, status_code
 
 

@@ -4,6 +4,7 @@ import os
 import random
 import socket
 import string
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -17,6 +18,9 @@ LOGIN_URL = "https://mcapi.knewcms.com:2087/auth/login"
 TEST_URL = "https://mcapi.knewcms.com:2087/lines/test"
 RESALE_MOVIE_URL = "https://mcapi.knewcms.com:2087/streams/resale/movie"
 RESALE_CANAL_URL = "https://mcapi.knewcms.com:2087/streams/resale/canal"
+RESALE_FINDALL_URL = "https://mcapi.knewcms.com:2087/streams/resale/findAll"
+REPORT_CONTENT_RESALE_URL = "https://mcapi.knewcms.com:2087/report-content/resale/create"
+TMDB_SEARCH_MOVIE_URL = "https://api.themoviedb.org/3/search/movie"
 BRAZIL_TZ = ZoneInfo("America/Sao_Paulo")
 TOKEN_LOCK_KEY = 92745131
 
@@ -403,6 +407,259 @@ def fetch_resale_stream_page(bearer_token: str, stream_kind: str, page: int = 1)
     return resp.status_code, {"url": url, "params": params}, body
 
 
+def fetch_resale_findall_page(bearer_token: str, search_text: str = "ss", page: int = 1):
+    safe_token = normalize_bearer_token(bearer_token)
+    headers = dict(STREAM_HEADERS_BASE)
+    headers["authorization"] = f"Bearer {safe_token}"
+    params = {"removeTmdbNull": "true", "search": (search_text or "ss"), "page": page}
+    resp = requests.get(RESALE_FINDALL_URL, headers=headers, params=params, timeout=30)
+    try:
+        body = resp.json()
+    except Exception:
+        body = {"raw": resp.text}
+    return resp.status_code, {"url": RESALE_FINDALL_URL, "params": params}, body
+
+
+def tmdb_image_url(path: str, width: str = "w400") -> str:
+    safe = (path or "").strip()
+    if not safe:
+        return ""
+    if safe.startswith("http://") or safe.startswith("https://"):
+        return safe
+    if not safe.startswith("/"):
+        safe = f"/{safe}"
+    return f"https://image.tmdb.org/t/p/{width}{safe}"
+
+
+def normalize_title_for_match(title: str) -> str:
+    text = unicodedata.normalize("NFKD", (title or ""))
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    cleaned = []
+    for ch in text.lower():
+        cleaned.append(ch if ch.isalnum() else " ")
+    return " ".join("".join(cleaned).split())
+
+
+def stream_kind_label(type_stream: str) -> str:
+    safe = (type_stream or "").strip().lower()
+    if safe == "movie":
+        return "Filme"
+    if safe == "series":
+        return "Serie"
+    return "Canal"
+
+
+def request_content_type_for_stream(type_stream: str) -> str:
+    safe = (type_stream or "").strip().lower()
+    if safe == "series":
+        return "serie"
+    if safe == "movie":
+        return "filme"
+    return "canal"
+
+
+def normalize_findall_search_items(payload, limit: int = 18):
+    rows = payload.get("data", []) if isinstance(payload, dict) else []
+    if not isinstance(rows, list):
+        return []
+
+    normalized = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        type_stream = (row.get("type_stream") or "movie").strip().lower()
+        sort_text = row.get("sort_order") or row.get("release_date") or row.get("added") or ""
+        sort_dt = parse_recent_datetime(sort_text)
+        tmdb_id = row.get("tmdb_id")
+        tmdb_id_text = str(tmdb_id).strip() if tmdb_id not in (None, "") else ""
+        normalized.append(
+            {
+                "id": row.get("id") or f"findall-{tmdb_id_text or rand_suffix(6)}",
+                "title": (row.get("title") or "").strip(),
+                "cover": (row.get("cover") or "").strip(),
+                "backdrop": (row.get("backdrop") or "").strip(),
+                "added": (row.get("added") or "").strip(),
+                "sort_order": (row.get("sort_order") or "").strip(),
+                "type_stream": type_stream,
+                "kind": type_stream,
+                "kind_label": stream_kind_label(type_stream),
+                "tmdb_id": tmdb_id_text,
+                "source": "mcapi_findall",
+                "can_request": True,
+                "request_content_type": request_content_type_for_stream(type_stream),
+                "sort_dt": sort_dt,
+            }
+        )
+
+    normalized.sort(key=lambda item: item.get("sort_dt") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    return normalized[: max(1, int(limit))]
+
+
+def fetch_tmdb_search_movie_page(query: str = "ss", page: int = 1, language: str = "pt-BR"):
+    tmdb_api_key = (os.getenv("TMDB_API_KEY") or "").strip()
+    tmdb_bearer = (os.getenv("TMDB_BEARER_TOKEN") or "").strip()
+    if not tmdb_api_key and not tmdb_bearer:
+        return 0, {"url": TMDB_SEARCH_MOVIE_URL, "params": {"query": query, "page": page}}, {"error": "tmdb_missing_credentials"}
+
+    headers = {"accept": "application/json"}
+    params = {
+        "query": query or "ss",
+        "include_adult": "false",
+        "language": language or "pt-BR",
+        "page": page,
+    }
+    if tmdb_api_key:
+        params["api_key"] = tmdb_api_key
+    if tmdb_bearer:
+        headers["authorization"] = f"Bearer {tmdb_bearer}"
+
+    resp = requests.get(TMDB_SEARCH_MOVIE_URL, headers=headers, params=params, timeout=30)
+    try:
+        body = resp.json()
+    except Exception:
+        body = {"raw": resp.text}
+    safe_params = dict(params)
+    if "api_key" in safe_params:
+        safe_params["api_key"] = "***"
+    return resp.status_code, {"url": TMDB_SEARCH_MOVIE_URL, "params": safe_params}, body
+
+
+def normalize_tmdb_movie_items(payload, limit: int = 18):
+    rows = payload.get("results", []) if isinstance(payload, dict) else []
+    if not isinstance(rows, list):
+        return []
+
+    normalized = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        tmdb_id = row.get("id")
+        if tmdb_id in (None, ""):
+            continue
+        title = (row.get("title") or row.get("original_title") or "").strip()
+        if not title:
+            continue
+        release_date = (row.get("release_date") or "").strip()
+        sort_dt = parse_recent_datetime(release_date) if release_date else None
+        added_text = ""
+        if release_date:
+            try:
+                added_text = datetime.strptime(release_date, "%Y-%m-%d").strftime("%d/%m/%Y")
+            except Exception:
+                added_text = ""
+        normalized.append(
+            {
+                "id": f"tmdb-{tmdb_id}",
+                "title": title,
+                "cover": tmdb_image_url(row.get("poster_path"), width="w400"),
+                "backdrop": tmdb_image_url(row.get("backdrop_path"), width="w780"),
+                "added": added_text,
+                "sort_order": release_date,
+                "type_stream": "movie",
+                "kind": "movie",
+                "kind_label": "Filme",
+                "tmdb_id": str(tmdb_id),
+                "source": "tmdb",
+                "can_request": True,
+                "request_content_type": "filme",
+                "sort_dt": sort_dt,
+            }
+        )
+
+    normalized.sort(key=lambda item: item.get("sort_dt") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    return normalized[: max(1, int(limit))]
+
+
+def reconcile_findall_with_tmdb(findall_items, tmdb_items, merged_limit: int = 18):
+    if not isinstance(findall_items, list):
+        findall_items = []
+    if not isinstance(tmdb_items, list):
+        tmdb_items = []
+
+    tmdb_by_id = {}
+    tmdb_by_title = {}
+    for tmdb in tmdb_items:
+        tmdb_id = (tmdb.get("tmdb_id") or "").strip()
+        if tmdb_id:
+            tmdb_by_id[tmdb_id] = tmdb
+        norm_title = normalize_title_for_match(tmdb.get("title", ""))
+        if norm_title:
+            tmdb_by_title[norm_title] = tmdb
+
+    seen_tmdb_ids = set()
+    seen_titles = set()
+    enriched_findall = []
+    for item in findall_items:
+        tmdb_id = (item.get("tmdb_id") or "").strip()
+        norm_title = normalize_title_for_match(item.get("title", ""))
+        tmdb_ref = tmdb_by_id.get(tmdb_id) if tmdb_id else tmdb_by_title.get(norm_title)
+        if tmdb_ref:
+            if not item.get("cover"):
+                item["cover"] = tmdb_ref.get("cover", "")
+            if not item.get("backdrop"):
+                item["backdrop"] = tmdb_ref.get("backdrop", "")
+        if tmdb_id:
+            seen_tmdb_ids.add(tmdb_id)
+        if norm_title:
+            seen_titles.add(norm_title)
+        enriched_findall.append(item)
+
+    tmdb_missing = []
+    for tmdb in tmdb_items:
+        tmdb_id = (tmdb.get("tmdb_id") or "").strip()
+        norm_title = normalize_title_for_match(tmdb.get("title", ""))
+        if tmdb_id and tmdb_id in seen_tmdb_ids:
+            continue
+        if norm_title and norm_title in seen_titles:
+            continue
+        tmdb_missing.append(tmdb)
+
+    merged = sorted(
+        enriched_findall + tmdb_missing,
+        key=lambda item: item.get("sort_dt") or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )[: max(1, int(merged_limit))]
+    return enriched_findall, tmdb_missing, merged
+
+
+def create_resale_content_request(
+    bearer_token: str,
+    *,
+    content_name: str,
+    content_type: str,
+    tmdb_id: str = "",
+    img_url: str = "",
+    user_id: str = "",
+):
+    safe_token = normalize_bearer_token(bearer_token)
+    headers = dict(STREAM_HEADERS_BASE)
+    headers["authorization"] = f"Bearer {safe_token}"
+
+    multipart_fields = [
+        ("content_name", (None, (content_name or "").strip())),
+        ("content_type", (None, (content_type or "filme").strip())),
+        ("tmdb_id", (None, (tmdb_id or "").strip())),
+        ("request", (None, "true")),
+        ("request_type", (None, "solicitacao")),
+        ("img_url", (None, (img_url or "").strip())),
+        ("user_id", (None, (user_id or "").strip())),
+    ]
+
+    resp = requests.post(REPORT_CONTENT_RESALE_URL, headers=headers, files=multipart_fields, timeout=30)
+    try:
+        body = resp.json()
+    except Exception:
+        body = {"raw": resp.text}
+
+    request_summary = {
+        "content_name": (content_name or "").strip(),
+        "content_type": (content_type or "filme").strip(),
+        "tmdb_id": (tmdb_id or "").strip(),
+        "user_id": (user_id or "").strip(),
+    }
+    return resp.status_code, request_summary, body
+
+
 def parse_recent_datetime(value):
     text = (value or "").strip()
     if not text:
@@ -410,6 +667,7 @@ def parse_recent_datetime(value):
 
     for parser in (
         lambda x: datetime.fromisoformat(x.replace("Z", "+00:00")),
+        lambda x: datetime.strptime(x, "%Y-%m-%d").replace(tzinfo=BRAZIL_TZ),
         lambda x: datetime.strptime(x, "%d/%m/%Y").replace(tzinfo=BRAZIL_TZ),
     ):
         try:
@@ -961,6 +1219,42 @@ def summarize_stream_payload(payload):
     }
 
 
+def resolve_bearer_for_user(
+    conn,
+    cfg,
+    *,
+    provided_bearer: str = "",
+    preferred_user_id: str = "",
+    client_ip: str = None,
+    allow_shared_fallback: bool = False,
+):
+    bearer_info = resolve_user_bearer_token(
+        conn,
+        provided_token=provided_bearer,
+        preferred_user_id=preferred_user_id,
+        allow_shared_fallback=allow_shared_fallback,
+    )
+    bearer_token = bearer_info.get("token")
+    if not bearer_token and allow_shared_fallback:
+        token_info = get_or_refresh_shared_token(conn, cfg, client_ip=client_ip, force_refresh=False)
+        if token_info.get("ok") and token_info.get("token"):
+            bearer_token = token_info.get("token")
+            parsed = parse_jwt_payload(bearer_token)
+            user_id_text = str(parsed.get("id")) if parsed.get("id") is not None else None
+            bearer_info = {
+                "source": "shared_token",
+                "user_id": user_id_text,
+                "expires_at": token_info.get("expires_at"),
+            }
+
+    return {
+        "token": bearer_token,
+        "source": bearer_info.get("source"),
+        "user_id": bearer_info.get("user_id"),
+        "expires_at": bearer_info.get("expires_at"),
+    }
+
+
 def fetch_recent_streams_for_user(
     provided_bearer: str = "",
     preferred_user_id: str = "",
@@ -971,21 +1265,15 @@ def fetch_recent_streams_for_user(
 ):
     conn, cfg = open_db_from_env()
     try:
-        bearer_info = resolve_user_bearer_token(
+        bearer_info = resolve_bearer_for_user(
             conn,
-            provided_token=provided_bearer,
+            cfg,
+            provided_bearer=provided_bearer,
             preferred_user_id=preferred_user_id,
+            client_ip=client_ip,
             allow_shared_fallback=allow_shared_fallback,
         )
         bearer_token = bearer_info.get("token")
-        if not bearer_token and allow_shared_fallback:
-            token_info = get_or_refresh_shared_token(conn, cfg, client_ip=client_ip, force_refresh=False)
-            if token_info.get("ok") and token_info.get("token"):
-                bearer_token = token_info.get("token")
-                bearer_info = {
-                    "source": "shared_token",
-                    "user_id": None,
-                }
 
         if not bearer_token:
             return {
@@ -1047,6 +1335,167 @@ def fetch_recent_streams_for_user(
             "movies": movies,
             "channels": channels,
             "merged": merged,
+        }
+    finally:
+        conn.close()
+
+
+def fetch_catalog_request_tracks_for_user(
+    provided_bearer: str = "",
+    preferred_user_id: str = "",
+    search_query: str = "ss",
+    findall_limit: int = 18,
+    tmdb_limit: int = 18,
+    merged_limit: int = 20,
+    client_ip: str = None,
+    allow_shared_fallback: bool = False,
+):
+    conn, cfg = open_db_from_env()
+    try:
+        bearer_info = resolve_bearer_for_user(
+            conn,
+            cfg,
+            provided_bearer=provided_bearer,
+            preferred_user_id=preferred_user_id,
+            client_ip=client_ip,
+            allow_shared_fallback=allow_shared_fallback,
+        )
+        bearer_token = bearer_info.get("token")
+        if not bearer_token:
+            return {
+                "ok": False,
+                "error": "Nenhum bearer disponivel para esta consulta.",
+                "token_source": bearer_info.get("source"),
+                "user_id": bearer_info.get("user_id"),
+                "findall_items": [],
+                "tmdb_missing_items": [],
+                "merged_items": [],
+            }
+
+        findall_status, findall_req, findall_resp = fetch_resale_findall_page(
+            bearer_token,
+            search_text=search_query,
+            page=1,
+        )
+        save_event(
+            conn,
+            event_type="resale_findall_search",
+            status_code=findall_status,
+            request_payload=findall_req,
+            response_payload=summarize_stream_payload(findall_resp),
+            error_message=None if findall_status < 400 else "findall search failed",
+            client_ip=client_ip,
+        )
+        findall_items = normalize_findall_search_items(findall_resp, limit=findall_limit) if findall_status < 400 else []
+
+        tmdb_status, tmdb_req, tmdb_resp = fetch_tmdb_search_movie_page(query=search_query, page=1)
+        tmdb_summary = summarize_stream_payload({"data": tmdb_resp.get("results", [])}) if isinstance(tmdb_resp, dict) else {"ok": False}
+        save_event(
+            conn,
+            event_type="tmdb_search_movie",
+            status_code=tmdb_status if tmdb_status else None,
+            request_payload=tmdb_req,
+            response_payload=tmdb_summary,
+            error_message=None if tmdb_status == 200 else "tmdb search unavailable",
+            client_ip=client_ip,
+        )
+        tmdb_items = normalize_tmdb_movie_items(tmdb_resp, limit=tmdb_limit) if tmdb_status == 200 else []
+
+        findall_items, tmdb_missing_items, merged_items = reconcile_findall_with_tmdb(
+            findall_items,
+            tmdb_items,
+            merged_limit=merged_limit,
+        )
+
+        for row in merged_items:
+            sort_dt = row.get("sort_dt")
+            if not row.get("added") and sort_dt:
+                row["added"] = sort_dt.astimezone(BRAZIL_TZ).strftime("%d/%m/%Y")
+            row.pop("sort_dt", None)
+        for row in findall_items:
+            row.pop("sort_dt", None)
+        for row in tmdb_missing_items:
+            row.pop("sort_dt", None)
+
+        return {
+            "ok": findall_status < 400,
+            "token_source": bearer_info.get("source"),
+            "user_id": bearer_info.get("user_id"),
+            "findall_status": findall_status,
+            "tmdb_status": tmdb_status,
+            "findall_items": findall_items,
+            "tmdb_missing_items": tmdb_missing_items,
+            "merged_items": merged_items,
+        }
+    finally:
+        conn.close()
+
+
+def submit_content_request_for_user(
+    *,
+    provided_bearer: str = "",
+    preferred_user_id: str = "",
+    content_name: str,
+    content_type: str = "filme",
+    tmdb_id: str = "",
+    img_url: str = "",
+    user_id: str = "",
+    client_ip: str = None,
+    allow_shared_fallback: bool = False,
+):
+    conn, cfg = open_db_from_env()
+    try:
+        bearer_info = resolve_bearer_for_user(
+            conn,
+            cfg,
+            provided_bearer=provided_bearer,
+            preferred_user_id=preferred_user_id,
+            client_ip=client_ip,
+            allow_shared_fallback=allow_shared_fallback,
+        )
+        bearer_token = bearer_info.get("token")
+        if not bearer_token:
+            return {
+                "ok": False,
+                "error": "Nenhum bearer disponivel para enviar pedido.",
+                "token_source": bearer_info.get("source"),
+                "user_id": bearer_info.get("user_id"),
+            }
+
+        resolved_user_id = (user_id or "").strip()
+        if not resolved_user_id:
+            resolved_user_id = (bearer_info.get("user_id") or "").strip()
+        if not resolved_user_id:
+            payload = parse_jwt_payload(bearer_token)
+            if payload.get("id") is not None:
+                resolved_user_id = str(payload.get("id"))
+
+        status_code, request_payload, response_payload = create_resale_content_request(
+            bearer_token,
+            content_name=content_name,
+            content_type=content_type,
+            tmdb_id=tmdb_id,
+            img_url=img_url,
+            user_id=resolved_user_id,
+        )
+        save_event(
+            conn,
+            event_type="resale_content_request",
+            status_code=status_code,
+            request_payload=request_payload,
+            response_payload=response_payload if isinstance(response_payload, dict) else {"raw": str(response_payload)},
+            error_message=None if status_code < 400 else "content request failed",
+            client_ip=client_ip,
+        )
+
+        ok = status_code < 400 and isinstance(response_payload, dict)
+        return {
+            "ok": ok,
+            "status_code": status_code,
+            "token_source": bearer_info.get("source"),
+            "user_id": resolved_user_id,
+            "request_payload": request_payload,
+            "response": response_payload,
         }
     finally:
         conn.close()
