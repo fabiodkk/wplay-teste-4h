@@ -602,7 +602,7 @@
     .vitrine-row-head {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-end;
       gap: 10px;
       margin-bottom: 6px;
       padding: 0 2px;
@@ -618,23 +618,20 @@
     }
 
     .vitrine-search {
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
       align-items: center;
       gap: 8px;
-      width: min(500px, 100%);
+      width: min(540px, 100%);
+      margin-left: auto;
     }
 
     .vitrine-search-input {
       padding: 8px 10px;
       border-radius: 10px;
       font-size: 12px;
-      min-width: 0;
-    }
-
-    .vitrine-search-row {
-      display: flex;
-      justify-content: flex-end;
-      margin: 0 2px 8px;
+      min-width: 160px;
+      width: auto;
     }
 
     .vitrine-search-btn {
@@ -664,7 +661,7 @@
     }
 
     .vitrine-search-status {
-      margin: 0 2px 7px;
+      margin: 0 2px 8px;
       font-size: 11px;
       color: #b9d9ed;
       min-height: 14px;
@@ -997,9 +994,14 @@
       .offer-pop { right: 10px; left: 10px; width: auto; }
       .mini-badges { gap: 7px; }
       .badge { font-size: 11px; }
-      .vitrine-row-head { flex-wrap: wrap; }
-      .vitrine-search { width: 100%; }
-      .vitrine-search-row { margin-bottom: 6px; }
+      .vitrine-row-head {
+        flex-wrap: wrap;
+        align-items: stretch;
+      }
+      .vitrine-search {
+        width: 100%;
+        margin-left: 0;
+      }
     }
 
     @media (min-width: 760px) {
@@ -1155,8 +1157,6 @@
           <div>
             <div class="vitrine-row-head">
               <p class="vitrine-row-title">Nao encontrou? Solicite agora</p>
-            </div>
-            <div class="vitrine-search-row">
               <div class="vitrine-search">
                 <input
                   class="vitrine-search-input"
