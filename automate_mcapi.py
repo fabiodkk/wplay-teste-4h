@@ -21,6 +21,10 @@ RESALE_CANAL_URL = "https://mcapi.knewcms.com:2087/streams/resale/canal"
 RESALE_FINDALL_URL = "https://mcapi.knewcms.com:2087/streams/resale/findAll"
 REPORT_CONTENT_RESALE_URL = "https://mcapi.knewcms.com:2087/report-content/resale/create"
 TMDB_SEARCH_MOVIE_URL = "https://api.themoviedb.org/3/search/movie"
+TMDB_DEFAULT_BEARER_TOKEN = (
+    "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJmMGU2ZDExZDllZTg3N2ViZTgyNTFiYmJiMzE3OGI1NSIsIm5iZiI6MTc3OTQwOTk0Mi4wODgsInN1YiI6IjZhMGZhNDE2MTZjNmUzYmIyMTIzNGZmNCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.C2DLCX9AxO1MjTHlEXTJBGgMwZHEgDpFoT7ARGRSZLg"
+)
+TMDB_DEFAULT_API_KEY = "f0e6d11d9ee877ebe8251bbbb3178b55"
 BRAZIL_TZ = ZoneInfo("America/Sao_Paulo")
 TOKEN_LOCK_KEY = 92745131
 
@@ -496,8 +500,8 @@ def normalize_findall_search_items(payload, limit: int = 18):
 
 
 def fetch_tmdb_search_movie_page(query: str = "ss", page: int = 1, language: str = "pt-BR"):
-    tmdb_api_key = (os.getenv("TMDB_API_KEY") or "").strip()
-    tmdb_bearer = (os.getenv("TMDB_BEARER_TOKEN") or "").strip()
+    tmdb_api_key = (os.getenv("TMDB_API_KEY") or TMDB_DEFAULT_API_KEY).strip()
+    tmdb_bearer = (os.getenv("TMDB_BEARER_TOKEN") or TMDB_DEFAULT_BEARER_TOKEN).strip()
     if not tmdb_api_key and not tmdb_bearer:
         return 0, {"url": TMDB_SEARCH_MOVIE_URL, "params": {"query": query, "page": page}}, {"error": "tmdb_missing_credentials"}
 
