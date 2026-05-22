@@ -1632,6 +1632,31 @@
     function humanizeTextForSpeech(text) {
       if (!text) return '';
       let out = text;
+      out = out.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      out = out.replace(/\s*([,;:.!?])\s*/g, '$1 ');
+      out = out.replace(/\s+/g, ' ').trim();
+      out = out.replace(/\bvoce\b/gi, 'você');
+      out = out.replace(/\bnao\b/gi, 'não');
+      out = out.replace(/\best[aá]\b/gi, 'está');
+      out = out.replace(/\bja\b/gi, 'já');
+      out = out.replace(/\bso\b/gi, 'só');
+      out = out.replace(/\bla\b/gi, 'lá');
+      out = out.replace(/\bguia\b/gi, 'guia');
+      out = out.replace(/\bnavegador\b/gi, 'navegador');
+      out = out.replace(/\busuario\b/gi, 'usuário');
+      out = out.replace(/\bsenha\b/gi, 'senha');
+      out = out.replace(/\bbonus\b/gi, 'bônus');
+      out = out.replace(/\binstalacao\b/gi, 'instalação');
+      out = out.replace(/\baplicativo\b/gi, 'aplicativo');
+      out = out.replace(/\btelegram\b/gi, 'télegram');
+      out = out.replace(/\bDownloader\b/gi, 'daunlôder');
+      out = out.replace(/\bPlay Store\b/gi, 'plei estór');
+      out = out.replace(/\bSamsung\b/gi, 'sãm-sung');
+      out = out.replace(/\bRoku\b/gi, 'rôku');
+      out = out.replace(/\bLG\b/gi, 'éle gê');
+      out = out.replace(/\bSmart TV\b/gi, 'esmart teve');
+      out = out.replace(/\bURL\b/gi, 'u érre éle');
+      out = out.replace(/\blink\b/gi, 'linque');
       out = out.replace(/\b4h\b/gi, '4 horas');
       out = out.replace(/\bTV\b/gi, 'teve');
       out = out.replace(/\bTCL\b/gi, 'ti ci el');
@@ -1640,7 +1665,18 @@
       out = out.replace(/\bAPK\b/gi, 'A P K');
       out = out.replace(/\bWPlay\b/gi, 'u play');
       out = out.replace(/\bWhatsApp\b/gi, 'uatsap');
+      out = out.replace(/\b(\d{2})(\d{2})(\d{2})(\d{2,})\b/g, '$1 $2 $3 $4');
+      out = out.replace(/\b(\d{2})(\d{2})(\d{2,})\b/g, '$1 $2 $3');
+      out = out.replace(/\b(\d{3})(\d{3})(\d{3})(\d{2})\b/g, '$1 $2 $3 $4');
+      out = out.replace(/\b55(\d{2})(\d{5})(\d{4})\b/g, 'mais 55, $1, $2, $3');
+      out = out.replace(/\b(\d{2})(\d{5})(\d{4})\b/g, '$1, $2, $3');
+      out = out.replace(/\b(\d{2})\/(\d{2})\/(\d{2,4})\b/g, '$1 barra $2 barra $3');
+      out = out.replace(/\b(\d+)-(\d+)\b/g, '$1, $2');
+      out = out.replace(/\b(\d+)\.(\d+)\b/g, '$1 vírgula $2');
+      out = out.replace(/\bR\$\s?(\d+),(\d{2})\b/gi, '$1 reais e $2 centavos');
       out = out.replace(/\b(\d{5,})\b/g, (m) => m.split('').join(' '));
+      out = out.replace(/\b(\d{2})\s+(\d{2})\s+(\d{2})\s+(\d{2,})\b/g, '$1, $2, $3, $4');
+      out = out.replace(/\b(\d{2})\s+(\d{2})\s+(\d{2,})\b/g, '$1, $2, $3');
       out = out.replace(/\b([a-zA-Z]+[0-9][a-zA-Z0-9]{2,})\b/g, (m) => m.split('').join(' '));
       out = out.replace(/\b([0-9]{2}),([0-9]{2})\b/g, '$1 e $2');
       return out;
@@ -1671,7 +1707,7 @@
         return name.includes('maria') && name.includes('microsoft');
       });
       const mariaAny = candidates.find((v) => (v.name || '').toLowerCase().includes('maria'));
-      guideVoice = mariaMicrosoft || mariaAny || null;
+      guideVoice = mariaMicrosoft || mariaAny || candidates[0] || voices[0] || null;
     }
 
     function splitSpeechText(text, maxLen = 210) {
@@ -1731,13 +1767,13 @@
         return;
       }
       if (!guideVoice) {
-        guideVoiceToggle.textContent = 'Voz Maria nao disponivel';
-        guideVoiceToggle.disabled = true;
+        guideVoiceToggle.textContent = 'Ativar voz do guia';
+        guideVoiceToggle.disabled = false;
         guideVoiceToggle.classList.remove('active');
-        guideVoiceNote.textContent = 'Esta maquina nao tem a voz Maria da Microsoft. Para usar, abra no Microsoft Edge do Windows.';
+        guideVoiceNote.textContent = 'A voz sera ativada assim que o navegador carregar uma voz disponivel.';
         return;
       }
-      const currentVoiceName = guideVoice.name || 'Maria Microsoft';
+      const currentVoiceName = guideVoice.name || 'voz padrao';
       if (guideVoiceEnabled) {
         guideVoiceToggle.textContent = 'Desativar voz do guia';
         guideVoiceToggle.classList.add('active');
@@ -1745,7 +1781,7 @@
       } else {
         guideVoiceToggle.textContent = 'Ativar voz do guia';
         guideVoiceToggle.classList.remove('active');
-        guideVoiceNote.textContent = `Narracao pausada. Voz fixa: ${currentVoiceName}.`;
+        guideVoiceNote.textContent = `Narracao pausada. Voz selecionada: ${currentVoiceName}.`;
       }
     }
 
@@ -1793,7 +1829,14 @@
     }
 
     guideVoiceToggle.addEventListener('click', () => {
-      if (!voiceSupported || !guideVoice) return;
+      if (!voiceSupported) return;
+      if (!guideVoice) {
+        pickGuideVoice();
+        if (!guideVoice) {
+          updateGuideVoiceUi();
+          return;
+        }
+      }
       if (!guideVoiceUnlocked) unlockGuideVoice();
       guideVoiceEnabled = !guideVoiceEnabled;
       if (!guideVoiceEnabled) {
