@@ -1903,16 +1903,16 @@
         return `
           <strong>Oba, percebi que deu certo. Agora use este acesso do seu teste de 4h:</strong>
           <ul>
-            <li>Usuario: <b>${TEST_ACCESS.username}</b></li>
+            <li>Usuário: <b>${TEST_ACCESS.username}</b></li>
             <li>Senha: <b>${TEST_ACCESS.password}</b></li>
             <li>Validade: <b>${TEST_ACCESS.exp || '4 horas'}</b></li>
           </ul>
         `;
       }
       return `
-        <strong>Quase la:</strong>
+        <strong>Quase lá:</strong>
         <ul>
-          <li>Toque em <b>Liberar teste agora</b> e eu ja uso esse acesso aqui no guia.</li>
+          <li>Toque em <b>Liberar teste agora</b> e eu já uso esse acesso aqui no guia.</li>
         </ul>
       `;
     }
@@ -1946,7 +1946,7 @@
     function showAdvancedHelp() {
       registerGuideError();
       advancedEl.style.display = 'block';
-      addBubble('Tudo bem, modo avancado liberado abaixo. Se preferir, eu te conecto no suporte agora no WhatsApp.', 'bot');
+      addBubble('Tudo bem, modo avançado liberado abaixo. Se preferir, eu te conecto no suporte agora no WhatsApp.', 'bot');
       setChoices([
         { label: 'Chamar suporte no WhatsApp', href: 'https://wa.me/5511989346164?text=Preciso%20de%20ajuda%20na%20instalacao%20da%20TV.' },
         { label: 'Tentar codigo 3964281 novamente', onClick: tclCodeStep }
@@ -1954,14 +1954,14 @@
     }
 
     function tclCodeStep() {
-      addBubble('Oba, percebi que voce ja baixou. Agora abra o Downloader e digite <b>3964281</b>.', 'bot');
+      addBubble('Oba, percebi que você já baixou. Agora abra o Downloader e digite <b>3964281</b>.', 'bot');
       setChoices([
         { label: 'Instalei com sucesso', onClick: finishInstall },
         {
           label: 'Deu erro',
           onClick: () => {
             registerGuideError();
-            addBubble('Isso e comum. TVs atuais pedem permissao para apps desconhecidos. Ative essa permissao e tente de novo.', 'bot');
+            addBubble('Isso é comum. TVs atuais pedem permissão para apps desconhecidos. Ative essa permissão e tente de novo.', 'bot');
             setChoices([
               { label: 'Permiti e funcionou', onClick: finishInstall },
               { label: 'Ainda com erro', onClick: showAdvancedHelp }
@@ -1974,13 +1974,13 @@
     function tclFlow() {
       addBubble('Oba, vi que você escolheu TV TCL. Então é fácil: abra a Play Store da TV e baixe o app <b>Downloader</b>.', 'bot');
       setChoices([
-        { label: 'Ja baixei', onClick: tclCodeStep },
+        { label: 'Já baixei', onClick: tclCodeStep },
         {
-          label: 'Ainda nao baixei',
+          label: 'Ainda não baixei',
           onClick: () => {
-            addBubble('Perfeito. Baixe o Downloader e depois toque em "Ja baixei" para continuar.', 'bot');
+            addBubble('Perfeito. Baixe o Downloader e depois toque em "Já baixei" para continuar.', 'bot');
             setChoices([
-              { label: 'Ja baixei', onClick: tclCodeStep },
+              { label: 'Já baixei', onClick: tclCodeStep },
               { label: 'Reiniciar guia', onClick: startGuide }
             ]);
           }
@@ -1993,9 +1993,9 @@
       setChoices([
         { label: 'Instalei', onClick: finishInstall },
         {
-          label: 'Nao achei / deu erro',
+          label: 'Não achei / deu erro',
           onClick: () => {
-            addBubble('Sem problema, vamos pelo metodo mais facil com Downloader.', 'bot');
+            addBubble('Sem problema, vamos pelo método mais fácil com Downloader.', 'bot');
             tclFlow();
           }
         }
@@ -2012,10 +2012,10 @@
         {
           label: 'Outra marca',
           onClick: () => {
-            addBubble('Ela e Android TV?', 'bot');
+            addBubble('Ela é Android TV?', 'bot');
             setChoices([
-              { label: 'Sim, e Android', onClick: tclFlow },
-              { label: 'Nao sei / nao e', onClick: showAdvancedHelp }
+              { label: 'Sim, é Android', onClick: tclFlow },
+              { label: 'Não sei / não é', onClick: showAdvancedHelp }
             ]);
           }
         }
@@ -2023,7 +2023,7 @@
     }
 
     function celularFlow() {
-      addBubble('Seu celular e Android ou iPhone?', 'bot');
+      addBubble('Seu celular é Android ou iPhone?', 'bot');
       setChoices([
         {
           label: 'Android',
@@ -2051,12 +2051,12 @@
     }
 
     function notebookFlow() {
-      addBubble('Seu notebook e Windows ou Macbook?', 'bot');
+      addBubble('Seu notebook é Windows ou Macbook?', 'bot');
       setChoices([
         {
           label: 'Windows',
           onClick: () => {
-            addBubble('Windows: baixe por um destes links:<br><a target="_blank" rel="noopener" href="https://rebrand.ly/5dee47">Opcao 1</a> | <a target="_blank" rel="noopener" href="https://rebrand.ly/2ce548">Opcao 2</a>', 'bot');
+            addBubble('Windows: baixe por um destes links:<br><a target="_blank" rel="noopener" href="https://rebrand.ly/5dee47">Opção 1</a> | <a target="_blank" rel="noopener" href="https://rebrand.ly/2ce548">Opção 2</a>', 'bot');
             setChoices([
               { label: 'Instalei no Windows', onClick: finishInstall },
               { label: 'Reiniciar guia', onClick: startGuide }
@@ -2082,9 +2082,9 @@
       guideStarted = true;
       guideErrorCount = 0;
       registerGuideInteraction();
-      addBubble('Oba, vamos instalar os canais na sua tela agora. Onde voce quer usar primeiro?', 'bot');
+      addBubble('Oba, vamos instalar os canais na sua tela agora. Onde você quer usar primeiro?', 'bot');
       if (TEST_ACCESS.username && TEST_ACCESS.password) {
-        addBubble(`Ja deixei separado seu acesso desta sessao:<br><b>Usuario:</b> ${TEST_ACCESS.username}<br><b>Senha:</b> ${TEST_ACCESS.password}`, 'bot');
+        addBubble(`Já deixei separado seu acesso desta sessão:<br><b>Usuário:</b> ${TEST_ACCESS.username}<br><b>Senha:</b> ${TEST_ACCESS.password}`, 'bot');
       }
       setChoices([
         { label: 'TV', onClick: tvFlow },
