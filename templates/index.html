@@ -608,6 +608,11 @@
       padding: 0 2px;
     }
 
+    .vitrine-row-head-search {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
     .vitrine-row-title {
       margin: 0;
       font-size: 11px;
@@ -623,15 +628,16 @@
       align-items: center;
       gap: 8px;
       width: min(540px, 100%);
-      margin-left: auto;
+      margin-left: 0;
+      justify-self: start;
     }
 
     .vitrine-search-input {
       padding: 8px 10px;
       border-radius: 10px;
       font-size: 12px;
-      min-width: 160px;
-      width: auto;
+      min-width: 0;
+      width: 100%;
     }
 
     .vitrine-search-btn {
@@ -1155,7 +1161,7 @@
           </div>
 
           <div>
-            <div class="vitrine-row-head">
+            <div class="vitrine-row-head vitrine-row-head-search">
               <p class="vitrine-row-title">Nao encontrou? Solicite agora</p>
               <div class="vitrine-search">
                 <input
@@ -1163,7 +1169,7 @@
                   id="vitrineSearchInput"
                   type="text"
                   placeholder="Buscar filme, serie ou canal para pedir"
-                  value="ss"
+                  value=""
                 >
                 <button class="vitrine-search-btn" id="vitrineSearchBtn" type="button">Buscar</button>
               </div>
@@ -1199,18 +1205,8 @@
                   <article class="vitrine-card">
                     <img src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=900&q=80" alt="Sugestao de filme">
                     <div class="vitrine-meta">
-                      <p class="vitrine-card-title">Jurassic World: O Mundo dos Dinossauros</p>
-                      <span class="vitrine-tag">Filme sugerido</span>
-                      <button
-                        class="vitrine-action js-pedir-conteudo"
-                        type="button"
-                        data-title="Jurassic World: O Mundo dos Dinossauros"
-                        data-content-type="filme"
-                        data-tmdb-id="135397"
-                        data-img-url=""
-                        data-user-id="{{ request_user_id or '' }}"
-                      >Pedir</button>
-                      <p class="vitrine-action-status" aria-live="polite"></p>
+                      <p class="vitrine-card-title">Pesquise pelo nome do conteudo</p>
+                      <span class="vitrine-tag">Mostramos apenas o que ainda nao esta no catalogo</span>
                     </div>
                   </article>
                 {% endif %}
@@ -1263,7 +1259,7 @@
       exp: {{ (basic.exp_date_brasilia if basic else '') | tojson }}
     };
     const REQUEST_USER_ID = {{ (request_user_id or '') | tojson }};
-    const DEFAULT_REQUEST_QUERY = 'ss';
+    const DEFAULT_REQUEST_QUERY = '';
 
     function ensureOfferStart() {
       const now = Date.now();
@@ -1498,6 +1494,13 @@
     async function runRequestSearch(searchValue) {
       if (!vitrineTrackPedidos) return;
       const query = (searchValue || '').trim() || DEFAULT_REQUEST_QUERY;
+      if (!query) {
+        setSearchStatus('Digite um filme, serie ou canal para buscar.', 'err');
+        if (vitrineSearchInput) {
+          vitrineSearchInput.focus();
+        }
+        return;
+      }
       if (vitrineSearchInput) vitrineSearchInput.value = query;
       if (vitrineSearchBtn) {
         vitrineSearchBtn.disabled = true;
@@ -1517,14 +1520,14 @@
             <article class="vitrine-card">
               <img src="https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=900&q=80" alt="Sem resultado para busca">
               <div class="vitrine-meta">
-                <p class="vitrine-card-title">Sem resultados para "${escapeHtml(query)}"</p>
-                <span class="vitrine-tag">Tente outro nome</span>
+                <p class="vitrine-card-title">Nenhum pedido pendente para "${escapeHtml(query)}"</p>
+                <span class="vitrine-tag">Esse titulo pode ja estar no catalogo</span>
               </div>
             </article>
           `;
           vitrineTrackPedidos.dataset.originalHtml = vitrineTrackPedidos.innerHTML;
           setupLoopTrack(vitrineTrackPedidos);
-          setSearchStatus(`Nenhum conteudo encontrado para "${query}".`, 'err');
+          setSearchStatus(`Nada pendente para "${query}". Se quiser, tente outro nome.`, 'ok');
           return;
         }
 

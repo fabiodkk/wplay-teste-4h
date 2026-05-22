@@ -82,10 +82,12 @@ def safe_recent_media(req, client_ip: str):
     }
 
 
-def safe_request_media(req, client_ip: str, search_query: str = "ss"):
+def safe_request_media(req, client_ip: str, search_query: str = ""):
     bearer = extract_bearer_from_request(req)
     preferred_user_id = (req.args.get("user_id") or req.headers.get("X-Mcapi-User-Id") or "").strip()
-    safe_search = (search_query or "ss").strip() or "ss"
+    safe_search = (search_query or "").strip()
+    if not safe_search:
+        return {"items": [], "ok": True, "token_source": "idle", "user_id": preferred_user_id}
     try:
         result = fetch_catalog_request_tracks_for_user(
             provided_bearer=bearer,

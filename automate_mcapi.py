@@ -21,6 +21,7 @@ RESALE_CANAL_URL = "https://mcapi.knewcms.com:2087/streams/resale/canal"
 RESALE_FINDALL_URL = "https://mcapi.knewcms.com:2087/streams/resale/findAll"
 REPORT_CONTENT_RESALE_URL = "https://mcapi.knewcms.com:2087/report-content/resale/create"
 TMDB_SEARCH_MOVIE_URL = "https://api.themoviedb.org/3/search/movie"
+TMDB_SEARCH_TV_URL = "https://api.themoviedb.org/3/search/tv"
 TMDB_DEFAULT_BEARER_TOKEN = (
     "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJmMGU2ZDExZDllZTg3N2ViZTgyNTFiYmJiMzE3OGI1NSIsIm5iZiI6MTc3OTQwOTk0Mi4wODgsInN1YiI6IjZhMGZhNDE2MTZjNmUzYmIyMTIzNGZmNCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.C2DLCX9AxO1MjTHlEXTJBGgMwZHEgDpFoT7ARGRSZLg"
 )
@@ -444,6 +445,15 @@ def normalize_title_for_match(title: str) -> str:
     return " ".join("".join(cleaned).split())
 
 
+def normalize_media_family(kind: str) -> str:
+    safe = (kind or "").strip().lower()
+    if safe in {"movie", "filme"}:
+        return "movie"
+    if safe in {"series", "serie", "tv", "show"}:
+        return "tv"
+    return ""
+
+
 def stream_kind_label(type_stream: str) -> str:
     safe = (type_stream or "").strip().lower()
     if safe == "movie":
@@ -499,11 +509,11 @@ def normalize_findall_search_items(payload, limit: int = 18):
     return normalized[: max(1, int(limit))]
 
 
-def fetch_tmdb_search_movie_page(query: str = "ss", page: int = 1, language: str = "pt-BR"):
+def fetch_tmdb_search_page(url: str, query: str = "ss", page: int = 1, language: str = "pt-BR"):
     tmdb_api_key = (os.getenv("TMDB_API_KEY") or TMDB_DEFAULT_API_KEY).strip()
     tmdb_bearer = (os.getenv("TMDB_BEARER_TOKEN") or TMDB_DEFAULT_BEARER_TOKEN).strip()
     if not tmdb_api_key and not tmdb_bearer:
-        return 0, {"url": TMDB_SEARCH_MOVIE_URL, "params": {"query": query, "page": page}}, {"error": "tmdb_missing_credentials"}
+        return 0, {"url": url, "params": {"query": query, "page": page}}, {"error": "tmdb_missing_credentials"}
 
     headers = {"accept": "application/json"}
     params = {
@@ -517,7 +527,7 @@ def fetch_tmdb_search_movie_page(query: str = "ss", page: int = 1, language: str
     if tmdb_bearer:
         headers["authorization"] = f"Bearer {tmdb_bearer}"
 
-    resp = requests.get(TMDB_SEARCH_MOVIE_URL, headers=headers, params=params, timeout=30)
+    resp = requests.get(url, headers=headers, params=params, timeout=30)
     try:
         body = resp.json()
     except Exception:
@@ -525,7 +535,15 @@ def fetch_tmdb_search_movie_page(query: str = "ss", page: int = 1, language: str
     safe_params = dict(params)
     if "api_key" in safe_params:
         safe_params["api_key"] = "***"
-    return resp.status_code, {"url": TMDB_SEARCH_MOVIE_URL, "params": safe_params}, body
+    return resp.status_code, {"url": url, "params": safe_params}, body
+
+
+def fetch_tmdb_search_movie_page(query: str = "ss", page: int = 1, language: str = "pt-BR"):
+    return fetch_tmdb_search_page(TMDB_SEARCH_MOVIE_URL, query=query, page=page, language=language)
+
+
+def fetch_tmdb_search_tv_page(query: str = "ss", page: int = 1, language: str = "pt-BR"):
+    return fetch_tmdb_search_page(TMDB_SEARCH_TV_URL, query=query, page=page, language=language)
 
 
 def normalize_tmdb_movie_items(payload, limit: int = 18):
@@ -563,9 +581,55 @@ def normalize_tmdb_movie_items(payload, limit: int = 18):
                 "kind": "movie",
                 "kind_label": "Filme",
                 "tmdb_id": str(tmdb_id),
-                "source": "tmdb",
+                "source": "tmdb_movie",
                 "can_request": True,
                 "request_content_type": "filme",
+                "sort_dt": sort_dt,
+            }
+        )
+
+    normalized.sort(key=lambda item: item.get("sort_dt") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    return normalized[: max(1, int(limit))]
+
+
+def normalize_tmdb_tv_items(payload, limit: int = 18):
+    rows = payload.get("results", []) if isinstance(payload, dict) else []
+    if not isinstance(rows, list):
+        return []
+
+    normalized = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        tmdb_id = row.get("id")
+        if tmdb_id in (None, ""):
+            continue
+        title = (row.get("name") or row.get("original_name") or "").strip()
+        if not title:
+            continue
+        first_air_date = (row.get("first_air_date") or "").strip()
+        sort_dt = parse_recent_datetime(first_air_date) if first_air_date else None
+        added_text = ""
+        if first_air_date:
+            try:
+                added_text = datetime.strptime(first_air_date, "%Y-%m-%d").strftime("%d/%m/%Y")
+            except Exception:
+                added_text = ""
+        normalized.append(
+            {
+                "id": f"tmdb-tv-{tmdb_id}",
+                "title": title,
+                "cover": tmdb_image_url(row.get("poster_path"), width="w400"),
+                "backdrop": tmdb_image_url(row.get("backdrop_path"), width="w780"),
+                "added": added_text,
+                "sort_order": first_air_date,
+                "type_stream": "series",
+                "kind": "series",
+                "kind_label": "Serie",
+                "tmdb_id": str(tmdb_id),
+                "source": "tmdb_tv",
+                "can_request": True,
+                "request_content_type": "serie",
                 "sort_dt": sort_dt,
             }
         )
@@ -580,46 +644,59 @@ def reconcile_findall_with_tmdb(findall_items, tmdb_items, merged_limit: int = 1
     if not isinstance(tmdb_items, list):
         tmdb_items = []
 
-    tmdb_by_id = {}
-    tmdb_by_title = {}
+    tmdb_by_family_id = {}
+    tmdb_by_family_title = {}
     for tmdb in tmdb_items:
+        family = normalize_media_family(tmdb.get("kind") or tmdb.get("type_stream"))
+        if not family:
+            continue
         tmdb_id = (tmdb.get("tmdb_id") or "").strip()
         if tmdb_id:
-            tmdb_by_id[tmdb_id] = tmdb
+            tmdb_by_family_id[(family, tmdb_id)] = tmdb
         norm_title = normalize_title_for_match(tmdb.get("title", ""))
         if norm_title:
-            tmdb_by_title[norm_title] = tmdb
+            tmdb_by_family_title[(family, norm_title)] = tmdb
 
-    seen_tmdb_ids = set()
-    seen_titles = set()
+    seen_family_tmdb_ids = set()
+    seen_family_titles = set()
     enriched_findall = []
     for item in findall_items:
+        family = normalize_media_family(item.get("kind") or item.get("type_stream"))
         tmdb_id = (item.get("tmdb_id") or "").strip()
         norm_title = normalize_title_for_match(item.get("title", ""))
-        tmdb_ref = tmdb_by_id.get(tmdb_id) if tmdb_id else tmdb_by_title.get(norm_title)
+        tmdb_ref = None
+        if family:
+            if tmdb_id:
+                tmdb_ref = tmdb_by_family_id.get((family, tmdb_id))
+            if tmdb_ref is None and norm_title:
+                tmdb_ref = tmdb_by_family_title.get((family, norm_title))
         if tmdb_ref:
             if not item.get("cover"):
                 item["cover"] = tmdb_ref.get("cover", "")
             if not item.get("backdrop"):
                 item["backdrop"] = tmdb_ref.get("backdrop", "")
-        if tmdb_id:
-            seen_tmdb_ids.add(tmdb_id)
-        if norm_title:
-            seen_titles.add(norm_title)
+        if family and tmdb_id:
+            seen_family_tmdb_ids.add((family, tmdb_id))
+        if family and norm_title:
+            seen_family_titles.add((family, norm_title))
+        item["can_request"] = False
         enriched_findall.append(item)
 
     tmdb_missing = []
     for tmdb in tmdb_items:
+        family = normalize_media_family(tmdb.get("kind") or tmdb.get("type_stream"))
+        if not family:
+            continue
         tmdb_id = (tmdb.get("tmdb_id") or "").strip()
         norm_title = normalize_title_for_match(tmdb.get("title", ""))
-        if tmdb_id and tmdb_id in seen_tmdb_ids:
+        if tmdb_id and (family, tmdb_id) in seen_family_tmdb_ids:
             continue
-        if norm_title and norm_title in seen_titles:
+        if norm_title and (family, norm_title) in seen_family_titles:
             continue
         tmdb_missing.append(tmdb)
 
     merged = sorted(
-        enriched_findall + tmdb_missing,
+        tmdb_missing,
         key=lambda item: item.get("sort_dt") or datetime.min.replace(tzinfo=timezone.utc),
         reverse=True,
     )[: max(1, int(merged_limit))]
@@ -1392,18 +1469,46 @@ def fetch_catalog_request_tracks_for_user(
         )
         findall_items = normalize_findall_search_items(findall_resp, limit=findall_limit) if findall_status < 400 else []
 
-        tmdb_status, tmdb_req, tmdb_resp = fetch_tmdb_search_movie_page(query=search_query, page=1)
-        tmdb_summary = summarize_stream_payload({"data": tmdb_resp.get("results", [])}) if isinstance(tmdb_resp, dict) else {"ok": False}
+        tmdb_movie_status, tmdb_movie_req, tmdb_movie_resp = fetch_tmdb_search_movie_page(query=search_query, page=1)
+        tmdb_movie_summary = (
+            summarize_stream_payload({"data": tmdb_movie_resp.get("results", [])})
+            if isinstance(tmdb_movie_resp, dict)
+            else {"ok": False}
+        )
         save_event(
             conn,
             event_type="tmdb_search_movie",
-            status_code=tmdb_status if tmdb_status else None,
-            request_payload=tmdb_req,
-            response_payload=tmdb_summary,
-            error_message=None if tmdb_status == 200 else "tmdb search unavailable",
+            status_code=tmdb_movie_status if tmdb_movie_status else None,
+            request_payload=tmdb_movie_req,
+            response_payload=tmdb_movie_summary,
+            error_message=None if tmdb_movie_status == 200 else "tmdb movie search unavailable",
             client_ip=client_ip,
         )
-        tmdb_items = normalize_tmdb_movie_items(tmdb_resp, limit=tmdb_limit) if tmdb_status == 200 else []
+
+        tmdb_tv_status, tmdb_tv_req, tmdb_tv_resp = fetch_tmdb_search_tv_page(query=search_query, page=1)
+        tmdb_tv_summary = (
+            summarize_stream_payload({"data": tmdb_tv_resp.get("results", [])})
+            if isinstance(tmdb_tv_resp, dict)
+            else {"ok": False}
+        )
+        save_event(
+            conn,
+            event_type="tmdb_search_tv",
+            status_code=tmdb_tv_status if tmdb_tv_status else None,
+            request_payload=tmdb_tv_req,
+            response_payload=tmdb_tv_summary,
+            error_message=None if tmdb_tv_status == 200 else "tmdb tv search unavailable",
+            client_ip=client_ip,
+        )
+
+        tmdb_movie_items = normalize_tmdb_movie_items(tmdb_movie_resp, limit=tmdb_limit) if tmdb_movie_status == 200 else []
+        tmdb_tv_items = normalize_tmdb_tv_items(tmdb_tv_resp, limit=tmdb_limit) if tmdb_tv_status == 200 else []
+        tmdb_items = sorted(
+            tmdb_movie_items + tmdb_tv_items,
+            key=lambda item: item.get("sort_dt") or datetime.min.replace(tzinfo=timezone.utc),
+            reverse=True,
+        )
+        tmdb_status = 200 if (tmdb_movie_status == 200 or tmdb_tv_status == 200) else (tmdb_movie_status or tmdb_tv_status or 0)
 
         findall_items, tmdb_missing_items, merged_items = reconcile_findall_with_tmdb(
             findall_items,
@@ -1427,6 +1532,8 @@ def fetch_catalog_request_tracks_for_user(
             "user_id": bearer_info.get("user_id"),
             "findall_status": findall_status,
             "tmdb_status": tmdb_status,
+            "tmdb_movie_status": tmdb_movie_status,
+            "tmdb_tv_status": tmdb_tv_status,
             "findall_items": findall_items,
             "tmdb_missing_items": tmdb_missing_items,
             "merged_items": merged_items,
