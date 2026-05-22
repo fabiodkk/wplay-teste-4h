@@ -617,6 +617,57 @@
       font-weight: 800;
     }
 
+    .vitrine-search {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: min(500px, 100%);
+    }
+
+    .vitrine-search-input {
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+      min-width: 0;
+    }
+
+    .vitrine-search-btn {
+      border: 1px solid rgba(110, 231, 255, .52);
+      background: linear-gradient(140deg, rgba(8, 51, 79, .95), rgba(7, 88, 117, .92));
+      color: #def4ff;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      padding: 8px 11px;
+      cursor: pointer;
+      transition: transform .2s ease, filter .2s ease;
+      white-space: nowrap;
+    }
+
+    .vitrine-search-btn:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.08);
+    }
+
+    .vitrine-search-btn[disabled] {
+      opacity: .75;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .vitrine-search-status {
+      margin: 0 2px 7px;
+      font-size: 11px;
+      color: #b9d9ed;
+      min-height: 14px;
+      line-height: 1.2;
+    }
+
+    .vitrine-search-status.ok { color: #8eeab9; }
+    .vitrine-search-status.err { color: #fecaca; }
+
     .vitrine-viewport {
       border-radius: 12px;
       overflow: hidden;
@@ -940,6 +991,8 @@
       .offer-pop { right: 10px; left: 10px; width: auto; }
       .mini-badges { gap: 7px; }
       .badge { font-size: 11px; }
+      .vitrine-row-head { flex-wrap: wrap; }
+      .vitrine-search { width: 100%; }
     }
 
     @media (min-width: 760px) {
@@ -1095,7 +1148,18 @@
           <div>
             <div class="vitrine-row-head">
               <p class="vitrine-row-title">Nao encontrou? Solicite agora</p>
+              <div class="vitrine-search">
+                <input
+                  class="vitrine-search-input"
+                  id="vitrineSearchInput"
+                  type="text"
+                  placeholder="Buscar filme, serie ou canal para pedir"
+                  value="ss"
+                >
+                <button class="vitrine-search-btn" id="vitrineSearchBtn" type="button">Buscar</button>
+              </div>
             </div>
+            <p class="vitrine-search-status" id="vitrineSearchStatus" aria-live="polite"></p>
             <div class="vitrine-viewport">
               <div class="vitrine-track fast" id="vitrineTrackPedidos" data-loop="true">
                 {% if request_media %}
@@ -1190,6 +1254,7 @@
       exp: {{ (basic.exp_date_brasilia if basic else '') | tojson }}
     };
     const REQUEST_USER_ID = {{ (request_user_id or '') | tojson }};
+    const DEFAULT_REQUEST_QUERY = 'ss';
 
     function ensureOfferStart() {
       const now = Date.now();
@@ -1322,13 +1387,29 @@
 
     const vitrine = document.getElementById('vitrineMidia');
     const vitrineToggle = document.getElementById('vitrineToggle');
+    const vitrineTrackPedidos = document.getElementById('vitrineTrackPedidos');
+    const vitrineSearchInput = document.getElementById('vitrineSearchInput');
+    const vitrineSearchBtn = document.getElementById('vitrineSearchBtn');
+    const vitrineSearchStatus = document.getElementById('vitrineSearchStatus');
 
-    document.querySelectorAll('.vitrine-track[data-loop="true"]').forEach((track) => {
-      if (track.dataset.cloned === '1') return;
-      if (!track.children.length) return;
-      track.innerHTML += track.innerHTML;
-      track.dataset.cloned = '1';
-    });
+    function setupLoopTrack(track) {
+      if (!track) return;
+      const baseline = track.dataset.originalHtml || track.innerHTML;
+      track.dataset.originalHtml = baseline;
+      track.innerHTML = baseline;
+      if (track.dataset.loop === 'true' && track.children.length > 0) {
+        track.innerHTML = `${baseline}${baseline}`;
+        track.dataset.cloned = '1';
+      }
+    }
+
+    function setupAllLoopTracks() {
+      document.querySelectorAll('.vitrine-track[data-loop="true"]').forEach((track) => {
+        setupLoopTrack(track);
+      });
+    }
+
+    setupAllLoopTracks();
 
     if (vitrine && vitrineToggle) {
       vitrineToggle.addEventListener('click', () => {
@@ -1344,64 +1425,186 @@
       return 'err';
     }
 
-    document.querySelectorAll('.js-pedir-conteudo').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const statusEl = btn.parentElement ? btn.parentElement.querySelector('.vitrine-action-status') : null;
-        const payload = {
-          content_name: (btn.dataset.title || '').trim(),
-          content_type: (btn.dataset.contentType || 'filme').trim(),
-          tmdb_id: (btn.dataset.tmdbId || '').trim(),
-          img_url: (btn.dataset.imgUrl || '').trim(),
-          user_id: (btn.dataset.userId || REQUEST_USER_ID || '').trim()
-        };
-        if (!payload.content_name) {
-          if (statusEl) {
-            statusEl.className = 'vitrine-action-status err';
-            statusEl.textContent = 'Nao foi possivel enviar este pedido.';
-          }
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function setSearchStatus(text, state = '') {
+      if (!vitrineSearchStatus) return;
+      vitrineSearchStatus.className = 'vitrine-search-status';
+      if (state) vitrineSearchStatus.classList.add(state);
+      vitrineSearchStatus.textContent = text || '';
+    }
+
+    function buildRequestCard(item) {
+      const title = escapeHtml(item.title || 'Sugestao de conteudo');
+      const image = escapeHtml(item.cover || item.backdrop || 'https://images.unsplash.com/photo-1505238680356-667803448bb6?auto=format&fit=crop&w=900&q=80');
+      const kind = escapeHtml(item.kind_label || 'Filme');
+      const added = (item.added || '').trim();
+      const tag = escapeHtml(added ? `${kind} • ${added}` : kind);
+      const contentType = escapeHtml(item.request_content_type || 'filme');
+      const tmdbId = escapeHtml(item.tmdb_id || '');
+      const imgUrl = escapeHtml(item.cover || item.backdrop || '');
+      const userId = escapeHtml(REQUEST_USER_ID || '');
+
+      if (item.can_request === false) {
+        return `
+          <article class="vitrine-card">
+            <img src="${image}" alt="${title}">
+            <div class="vitrine-meta">
+              <p class="vitrine-card-title">${title}</p>
+              <span class="vitrine-tag">${tag}</span>
+              <p class="vitrine-action-status">Ja disponivel no catalogo</p>
+            </div>
+          </article>
+        `;
+      }
+
+      return `
+        <article class="vitrine-card">
+          <img src="${image}" alt="${title}">
+          <div class="vitrine-meta">
+            <p class="vitrine-card-title">${title}</p>
+            <span class="vitrine-tag">${tag}</span>
+            <button
+              class="vitrine-action js-pedir-conteudo"
+              type="button"
+              data-title="${title}"
+              data-content-type="${contentType}"
+              data-tmdb-id="${tmdbId}"
+              data-img-url="${imgUrl}"
+              data-user-id="${userId}"
+            >Pedir</button>
+            <p class="vitrine-action-status" aria-live="polite"></p>
+          </div>
+        </article>
+      `;
+    }
+
+    async function runRequestSearch(searchValue) {
+      if (!vitrineTrackPedidos) return;
+      const query = (searchValue || '').trim() || DEFAULT_REQUEST_QUERY;
+      if (vitrineSearchInput) vitrineSearchInput.value = query;
+      if (vitrineSearchBtn) {
+        vitrineSearchBtn.disabled = true;
+        vitrineSearchBtn.textContent = 'Buscando...';
+      }
+      setSearchStatus('Buscando resultados...', '');
+
+      try {
+        const params = new URLSearchParams({ query });
+        if (REQUEST_USER_ID) params.set('user_id', REQUEST_USER_ID);
+        const resp = await fetch(`/api/solicitacoes?${params.toString()}`);
+        const data = await resp.json().catch(() => ({}));
+        const items = Array.isArray(data.merged_items) ? data.merged_items : [];
+
+        if (!items.length) {
+          vitrineTrackPedidos.innerHTML = `
+            <article class="vitrine-card">
+              <img src="https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=900&q=80" alt="Sem resultado para busca">
+              <div class="vitrine-meta">
+                <p class="vitrine-card-title">Sem resultados para "${escapeHtml(query)}"</p>
+                <span class="vitrine-tag">Tente outro nome</span>
+              </div>
+            </article>
+          `;
+          vitrineTrackPedidos.dataset.originalHtml = vitrineTrackPedidos.innerHTML;
+          setupLoopTrack(vitrineTrackPedidos);
+          setSearchStatus(`Nenhum conteudo encontrado para "${query}".`, 'err');
           return;
         }
 
-        const originalLabel = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = 'Enviando...';
-        if (statusEl) {
-          statusEl.className = 'vitrine-action-status';
-          statusEl.textContent = 'Enviando pedido...';
+        vitrineTrackPedidos.innerHTML = items.map(buildRequestCard).join('');
+        vitrineTrackPedidos.dataset.originalHtml = vitrineTrackPedidos.innerHTML;
+        setupLoopTrack(vitrineTrackPedidos);
+        setSearchStatus(`${items.length} sugestoes para "${query}".`, resp.ok ? 'ok' : 'err');
+      } catch (_) {
+        setSearchStatus('Falha na busca agora. Tente novamente em instantes.', 'err');
+      } finally {
+        if (vitrineSearchBtn) {
+          vitrineSearchBtn.disabled = false;
+          vitrineSearchBtn.textContent = 'Buscar';
         }
+      }
+    }
 
-        try {
-          const resp = await fetch('/api/pedir-conteudo', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          const data = await resp.json().catch(() => ({}));
-          const apiResp = data && typeof data === 'object' ? (data.response || data) : {};
-          const statusText = apiResp.status || (data.ok ? 'pendente' : 'erro');
-          const requestId = apiResp.content_request_id || apiResp._id || '';
-          const statusClass = normalizeRequestStatus(statusText);
-          if (statusEl) {
-            statusEl.className = `vitrine-action-status ${statusClass}`;
-            statusEl.textContent = requestId
-              ? `Pedido em analise (${requestId}).`
-              : `Pedido em analise para ${payload.content_name}.`;
-          }
-          if (!resp.ok || !data.ok) {
-            btn.disabled = false;
-            btn.textContent = originalLabel;
-            return;
-          }
-          btn.textContent = 'Pedido enviado';
-        } catch (_) {
-          if (statusEl) {
-            statusEl.className = 'vitrine-action-status err';
-            statusEl.textContent = 'Falha ao enviar agora. Tente novamente.';
-          }
-          btn.disabled = false;
-          btn.textContent = originalLabel;
+    if (vitrineSearchBtn && vitrineSearchInput) {
+      vitrineSearchBtn.addEventListener('click', () => {
+        runRequestSearch(vitrineSearchInput.value);
+      });
+      vitrineSearchInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          runRequestSearch(vitrineSearchInput.value);
         }
       });
+    }
+
+    document.addEventListener('click', async (event) => {
+      const btn = event.target.closest('.js-pedir-conteudo');
+      if (!btn) return;
+      if (btn.disabled) return;
+
+      const statusEl = btn.parentElement ? btn.parentElement.querySelector('.vitrine-action-status') : null;
+      const payload = {
+        content_name: (btn.dataset.title || '').trim(),
+        content_type: (btn.dataset.contentType || 'filme').trim(),
+        tmdb_id: (btn.dataset.tmdbId || '').trim(),
+        img_url: (btn.dataset.imgUrl || '').trim(),
+        user_id: (btn.dataset.userId || REQUEST_USER_ID || '').trim()
+      };
+      if (!payload.content_name) {
+        if (statusEl) {
+          statusEl.className = 'vitrine-action-status err';
+          statusEl.textContent = 'Nao foi possivel enviar este pedido.';
+        }
+        return;
+      }
+
+      const originalLabel = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+      if (statusEl) {
+        statusEl.className = 'vitrine-action-status';
+        statusEl.textContent = 'Enviando pedido...';
+      }
+
+      try {
+        const resp = await fetch('/api/pedir-conteudo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await resp.json().catch(() => ({}));
+        const apiResp = data && typeof data === 'object' ? (data.response || data) : {};
+        const statusText = apiResp.status || (data.ok ? 'pendente' : 'erro');
+        const requestId = apiResp.content_request_id || apiResp._id || '';
+        const statusClass = normalizeRequestStatus(statusText);
+        if (statusEl) {
+          statusEl.className = `vitrine-action-status ${statusClass}`;
+          statusEl.textContent = requestId
+            ? `Pedido em analise (${requestId}).`
+            : `Pedido em analise para ${payload.content_name}.`;
+        }
+        if (!resp.ok || !data.ok) {
+          btn.disabled = false;
+          btn.textContent = originalLabel;
+          return;
+        }
+        btn.textContent = 'Pedido enviado';
+      } catch (_) {
+        if (statusEl) {
+          statusEl.className = 'vitrine-action-status err';
+          statusEl.textContent = 'Falha ao enviar agora. Tente novamente.';
+        }
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+      }
     });
 
     const chatEl = document.getElementById('wizardChat');

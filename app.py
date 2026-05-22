@@ -82,14 +82,15 @@ def safe_recent_media(req, client_ip: str):
     }
 
 
-def safe_request_media(req, client_ip: str):
+def safe_request_media(req, client_ip: str, search_query: str = "ss"):
     bearer = extract_bearer_from_request(req)
     preferred_user_id = (req.args.get("user_id") or req.headers.get("X-Mcapi-User-Id") or "").strip()
+    safe_search = (search_query or "ss").strip() or "ss"
     try:
         result = fetch_catalog_request_tracks_for_user(
             provided_bearer=bearer,
             preferred_user_id=preferred_user_id,
-            search_query="ss",
+            search_query=safe_search,
             findall_limit=14,
             tmdb_limit=14,
             merged_limit=18,
@@ -259,6 +260,27 @@ def api_recentes():
         preferred_user_id=preferred_user_id,
         movies_limit=20,
         channels_limit=20,
+        client_ip=client_ip,
+        allow_shared_fallback=True,
+    )
+    status_code = 200 if result.get("ok") else 400
+    return result, status_code
+
+
+@app.get("/api/solicitacoes")
+def api_solicitacoes():
+    client_ip = get_client_ip(request)
+    bearer = extract_bearer_from_request(request)
+    preferred_user_id = (request.args.get("user_id") or request.headers.get("X-Mcapi-User-Id") or "").strip()
+    search_query = (request.args.get("query") or request.args.get("search") or "ss").strip() or "ss"
+
+    result = fetch_catalog_request_tracks_for_user(
+        provided_bearer=bearer,
+        preferred_user_id=preferred_user_id,
+        search_query=search_query,
+        findall_limit=18,
+        tmdb_limit=18,
+        merged_limit=24,
         client_ip=client_ip,
         allow_shared_fallback=True,
     )
