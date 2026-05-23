@@ -804,6 +804,12 @@
       margin-bottom: 8px;
     }
 
+    .precheck-controls {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+    }
+
     .vitrine.collapsed .vitrine-sub,
     .vitrine.collapsed .vitrine-stack {
       display: none;
@@ -1050,34 +1056,6 @@
         <div class="badge">Suporte no WhatsApp</div>
       </div>
 
-      <div class="precheck">
-        <div class="vitrine-row-head vitrine-row-head-search">
-          <p class="vitrine-row-title">Veja se ja tem no catalogo</p>
-          <div class="vitrine-search">
-            <input
-              class="vitrine-search-input"
-              id="precheckSearchInput"
-              type="text"
-              placeholder="Ex: The Boroughs, HBO, UFC, anime..."
-              value=""
-            >
-            <button class="vitrine-search-btn" id="precheckSearchBtn" type="button">Buscar</button>
-          </div>
-        </div>
-        <p class="vitrine-search-status" id="precheckSearchStatus" aria-live="polite"></p>
-        <div class="vitrine-viewport">
-          <div class="vitrine-track fast" id="precheckTrack" data-loop="true">
-            <article class="vitrine-card">
-              <img src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=900&q=80" alt="Busca de disponibilidade">
-              <div class="vitrine-meta">
-                <p class="vitrine-card-title">Busque antes de comprar</p>
-                <span class="vitrine-tag">Mostramos o que ja esta no catalogo</span>
-              </div>
-            </article>
-          </div>
-        </div>
-      </div>
-
       <form method="post" action="/gerar" class="grid">
         <div class="row double">
           <input type="text" name="telefone" value="{{ form_phone }}" placeholder="Seu WhatsApp com DDD (obrigatorio)" required>
@@ -1196,6 +1174,39 @@
                     </div>
                   </article>
                 {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="precheck">
+              <div class="vitrine-row-head vitrine-row-head-search">
+                <p class="vitrine-row-title">Veja se ja tem no catalogo</p>
+                <div class="precheck-controls">
+                  <div class="vitrine-search">
+                    <input
+                      class="vitrine-search-input"
+                      id="precheckSearchInput"
+                      type="text"
+                      placeholder="Ex: The Boroughs, HBO, UFC, anime..."
+                      value=""
+                    >
+                    <button class="vitrine-search-btn" id="precheckSearchBtn" type="button">Buscar</button>
+                  </div>
+                  <button class="vitrine-search-btn" id="precheckNextBtn" type="button" disabled>+3</button>
+                </div>
+              </div>
+              <p class="vitrine-search-status" id="precheckSearchStatus" aria-live="polite"></p>
+              <div class="vitrine-viewport">
+                <div class="vitrine-track fast" id="precheckTrack" data-loop="false">
+                  <article class="vitrine-card">
+                    <img src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=900&q=80" alt="Busca de disponibilidade">
+                    <div class="vitrine-meta">
+                      <p class="vitrine-card-title">Busque antes de comprar</p>
+                      <span class="vitrine-tag">Mostramos o que ja esta no catalogo</span>
+                    </div>
+                  </article>
+                </div>
               </div>
             </div>
           </div>
@@ -1439,7 +1450,10 @@
     const precheckTrack = document.getElementById('precheckTrack');
     const precheckSearchInput = document.getElementById('precheckSearchInput');
     const precheckSearchBtn = document.getElementById('precheckSearchBtn');
+    const precheckNextBtn = document.getElementById('precheckNextBtn');
     const precheckSearchStatus = document.getElementById('precheckSearchStatus');
+    let precheckItems = [];
+    let precheckOffset = 0;
 
     function setupLoopTrack(track) {
       if (!track) return;
@@ -1554,6 +1568,17 @@
       `;
     }
 
+    function renderPrecheckWindow() {
+      if (!precheckTrack) return;
+      if (!precheckItems.length) return;
+      const windowItems = precheckItems.slice(precheckOffset, precheckOffset + 3);
+      precheckTrack.innerHTML = windowItems.map(buildAvailabilityCard).join('');
+      precheckTrack.dataset.originalHtml = precheckTrack.innerHTML;
+      if (precheckNextBtn) {
+        precheckNextBtn.disabled = precheckItems.length <= 3;
+      }
+    }
+
     async function runPrecheckSearch(searchValue) {
       if (!precheckTrack) return;
       const query = (searchValue || '').trim();
@@ -1583,6 +1608,8 @@
         const available = Array.isArray(data.findall_items) ? data.findall_items : [];
 
         if (!available.length) {
+          precheckItems = [];
+          precheckOffset = 0;
           precheckTrack.innerHTML = `
             <article class="vitrine-card">
               <img src="https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=900&q=80" alt="Sem disponibilidade para busca">
@@ -1593,7 +1620,7 @@
             </article>
           `;
           precheckTrack.dataset.originalHtml = precheckTrack.innerHTML;
-          setupLoopTrack(precheckTrack);
+          if (precheckNextBtn) precheckNextBtn.disabled = true;
           if (precheckSearchStatus) {
             precheckSearchStatus.className = 'vitrine-search-status err';
             precheckSearchStatus.textContent = `Sem resultado no catalogo para "${query}".`;
@@ -1601,9 +1628,9 @@
           return;
         }
 
-        precheckTrack.innerHTML = available.slice(0, 12).map(buildAvailabilityCard).join('');
-        precheckTrack.dataset.originalHtml = precheckTrack.innerHTML;
-        setupLoopTrack(precheckTrack);
+        precheckItems = available.slice(0, 24);
+        precheckOffset = 0;
+        renderPrecheckWindow();
         if (precheckSearchStatus) {
           precheckSearchStatus.className = 'vitrine-search-status ok';
           precheckSearchStatus.textContent = `${available.length} resultado(s) disponivel(is) para "${query}".`;
@@ -1696,6 +1723,15 @@
           event.preventDefault();
           runPrecheckSearch(precheckSearchInput.value);
         }
+      });
+    }
+
+    if (precheckNextBtn) {
+      precheckNextBtn.addEventListener('click', () => {
+        if (!precheckItems.length || precheckItems.length <= 3) return;
+        precheckOffset += 3;
+        if (precheckOffset >= precheckItems.length) precheckOffset = 0;
+        renderPrecheckWindow();
       });
     }
 
