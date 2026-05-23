@@ -814,6 +814,34 @@
       animation: none;
     }
 
+    .precheck-next-btn {
+      width: 36px;
+      min-width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      padding: 0;
+      font-size: 22px;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255, 255, 255, .28);
+      background: linear-gradient(145deg, rgba(7, 38, 62, .95), rgba(10, 95, 122, .9));
+      color: #e9f8ff;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, .28);
+    }
+
+    .precheck-next-btn:hover {
+      transform: translateY(-1px) scale(1.03);
+      filter: brightness(1.1);
+    }
+
+    .precheck-next-btn[disabled] {
+      opacity: .45;
+      box-shadow: none;
+      transform: none;
+    }
+
     .vitrine.collapsed .vitrine-sub,
     .vitrine.collapsed .vitrine-stack {
       display: none;
@@ -1197,7 +1225,14 @@
                     >
                     <button class="vitrine-search-btn" id="precheckSearchBtn" type="button">Buscar</button>
                   </div>
-                  <button class="vitrine-search-btn" id="precheckNextBtn" type="button" disabled>+3</button>
+                  <button
+                    class="vitrine-search-btn precheck-next-btn"
+                    id="precheckNextBtn"
+                    type="button"
+                    aria-label="Avancar 3 resultados"
+                    title="Avancar 3 resultados"
+                    disabled
+                  >›</button>
                 </div>
               </div>
               <p class="vitrine-search-status" id="precheckSearchStatus" aria-live="polite"></p>
