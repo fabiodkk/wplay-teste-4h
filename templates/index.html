@@ -826,24 +826,27 @@
 
     .carousel-nav {
       position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 54px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 46px;
+      height: 132px;
+      border-radius: 12px;
       border: 0;
       cursor: pointer;
-      z-index: 3;
-      opacity: .6;
+      z-index: 8;
+      opacity: .92;
       transition: opacity .2s ease, filter .2s ease, background .2s ease;
-      background-color: transparent;
+      background-color: rgba(3, 17, 30, .78);
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 0;
-      font-size: 46px;
+      font-size: 48px;
       font-weight: 900;
       line-height: 1;
-      color: rgba(238, 249, 255, .96);
-      text-shadow: 0 3px 10px rgba(0, 0, 0, .62);
+      color: rgba(242, 251, 255, 1);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
+      text-shadow: 0 2px 6px rgba(0, 0, 0, .7);
     }
 
     .carousel-nav:hover {
@@ -852,21 +855,17 @@
     }
 
     .carousel-nav[disabled] {
-      opacity: .22;
+      opacity: .28;
       cursor: not-allowed;
       filter: none;
     }
 
     .carousel-nav.prev {
-      left: 0;
-      background: linear-gradient(to right, rgba(3, 17, 30, .74), rgba(3, 17, 30, .14), transparent);
+      left: 10px;
     }
 
     .carousel-nav.next {
-      right: 0;
-      background: linear-gradient(to left, rgba(3, 17, 30, .74), rgba(3, 17, 30, .14), transparent);
-      justify-content: flex-end;
-      padding-right: 8px;
+      right: 10px;
     }
 
     .carousel-nav::before {
@@ -876,12 +875,12 @@
 
     .carousel-nav.prev::before {
       content: "❮";
-      margin-left: 6px;
+      margin-left: 2px;
     }
 
     .carousel-nav.next::before {
       content: "❯";
-      margin-right: 2px;
+      margin-right: 0;
     }
 
     .vitrine.collapsed .vitrine-sub,
