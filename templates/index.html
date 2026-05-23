@@ -792,6 +792,18 @@
     .vitrine-action-status.ok { color: #8eeab9; }
     .vitrine-action-status.err { color: #fecaca; }
 
+    .precheck {
+      margin-top: 14px;
+      padding: 12px;
+      border: 1px solid rgba(110, 231, 255, .24);
+      border-radius: 14px;
+      background: rgba(2, 18, 31, .5);
+    }
+
+    .precheck .vitrine-row-head {
+      margin-bottom: 8px;
+    }
+
     .vitrine.collapsed .vitrine-sub,
     .vitrine.collapsed .vitrine-stack {
       display: none;
@@ -1036,6 +1048,34 @@
       <div class="mini-badges">
         <div class="badge">Liberacao rapida</div>
         <div class="badge">Suporte no WhatsApp</div>
+      </div>
+
+      <div class="precheck">
+        <div class="vitrine-row-head vitrine-row-head-search">
+          <p class="vitrine-row-title">Veja se ja tem no catalogo</p>
+          <div class="vitrine-search">
+            <input
+              class="vitrine-search-input"
+              id="precheckSearchInput"
+              type="text"
+              placeholder="Ex: The Boroughs, HBO, UFC, anime..."
+              value=""
+            >
+            <button class="vitrine-search-btn" id="precheckSearchBtn" type="button">Buscar</button>
+          </div>
+        </div>
+        <p class="vitrine-search-status" id="precheckSearchStatus" aria-live="polite"></p>
+        <div class="vitrine-viewport">
+          <div class="vitrine-track fast" id="precheckTrack" data-loop="true">
+            <article class="vitrine-card">
+              <img src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=900&q=80" alt="Busca de disponibilidade">
+              <div class="vitrine-meta">
+                <p class="vitrine-card-title">Busque antes de comprar</p>
+                <span class="vitrine-tag">Mostramos o que ja esta no catalogo</span>
+              </div>
+            </article>
+          </div>
+        </div>
       </div>
 
       <form method="post" action="/gerar" class="grid">
@@ -1396,6 +1436,10 @@
     const vitrineSearchInput = document.getElementById('vitrineSearchInput');
     const vitrineSearchBtn = document.getElementById('vitrineSearchBtn');
     const vitrineSearchStatus = document.getElementById('vitrineSearchStatus');
+    const precheckTrack = document.getElementById('precheckTrack');
+    const precheckSearchInput = document.getElementById('precheckSearchInput');
+    const precheckSearchBtn = document.getElementById('precheckSearchBtn');
+    const precheckSearchStatus = document.getElementById('precheckSearchStatus');
 
     function setupLoopTrack(track) {
       if (!track) return;
@@ -1491,6 +1535,92 @@
       `;
     }
 
+    function buildAvailabilityCard(item) {
+      const title = escapeHtml(item.title || 'Conteudo encontrado');
+      const image = escapeHtml(item.cover || item.backdrop || 'https://images.unsplash.com/photo-1505238680356-667803448bb6?auto=format&fit=crop&w=900&q=80');
+      const typeStream = (item.type_stream || item.kind || '').toLowerCase();
+      const tagBase = typeStream === 'series' ? 'Serie' : (typeStream === 'movie' ? 'Filme' : 'Canal');
+      const tagDate = item.added ? ` • ${escapeHtml(item.added)}` : '';
+      const tag = `${tagBase}${tagDate}`;
+      return `
+        <article class="vitrine-card">
+          <img src="${image}" alt="${title}">
+          <div class="vitrine-meta">
+            <p class="vitrine-card-title">${title}</p>
+            <span class="vitrine-tag">${tag}</span>
+            <p class="vitrine-action-status ok">Disponivel no catalogo</p>
+          </div>
+        </article>
+      `;
+    }
+
+    async function runPrecheckSearch(searchValue) {
+      if (!precheckTrack) return;
+      const query = (searchValue || '').trim();
+      if (!query) {
+        if (precheckSearchStatus) {
+          precheckSearchStatus.className = 'vitrine-search-status err';
+          precheckSearchStatus.textContent = 'Digite o nome do filme, serie ou canal.';
+        }
+        if (precheckSearchInput) precheckSearchInput.focus();
+        return;
+      }
+
+      if (precheckSearchBtn) {
+        precheckSearchBtn.disabled = true;
+        precheckSearchBtn.textContent = 'Buscando...';
+      }
+      if (precheckSearchStatus) {
+        precheckSearchStatus.className = 'vitrine-search-status';
+        precheckSearchStatus.textContent = 'Consultando catalogo...';
+      }
+
+      try {
+        const params = new URLSearchParams({ query });
+        if (REQUEST_USER_ID) params.set('user_id', REQUEST_USER_ID);
+        const resp = await fetch(`/api/solicitacoes?${params.toString()}`);
+        const data = await resp.json().catch(() => ({}));
+        const available = Array.isArray(data.findall_items) ? data.findall_items : [];
+
+        if (!available.length) {
+          precheckTrack.innerHTML = `
+            <article class="vitrine-card">
+              <img src="https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=900&q=80" alt="Sem disponibilidade para busca">
+              <div class="vitrine-meta">
+                <p class="vitrine-card-title">Nao encontramos "${escapeHtml(query)}" agora</p>
+                <span class="vitrine-tag">Pode pedir esse conteudo na secao abaixo</span>
+              </div>
+            </article>
+          `;
+          precheckTrack.dataset.originalHtml = precheckTrack.innerHTML;
+          setupLoopTrack(precheckTrack);
+          if (precheckSearchStatus) {
+            precheckSearchStatus.className = 'vitrine-search-status err';
+            precheckSearchStatus.textContent = `Sem resultado no catalogo para "${query}".`;
+          }
+          return;
+        }
+
+        precheckTrack.innerHTML = available.slice(0, 12).map(buildAvailabilityCard).join('');
+        precheckTrack.dataset.originalHtml = precheckTrack.innerHTML;
+        setupLoopTrack(precheckTrack);
+        if (precheckSearchStatus) {
+          precheckSearchStatus.className = 'vitrine-search-status ok';
+          precheckSearchStatus.textContent = `${available.length} resultado(s) disponivel(is) para "${query}".`;
+        }
+      } catch (_) {
+        if (precheckSearchStatus) {
+          precheckSearchStatus.className = 'vitrine-search-status err';
+          precheckSearchStatus.textContent = 'Falha na consulta agora. Tente novamente em instantes.';
+        }
+      } finally {
+        if (precheckSearchBtn) {
+          precheckSearchBtn.disabled = false;
+          precheckSearchBtn.textContent = 'Buscar';
+        }
+      }
+    }
+
     async function runRequestSearch(searchValue) {
       if (!vitrineTrackPedidos) return;
       const query = (searchValue || '').trim() || DEFAULT_REQUEST_QUERY;
@@ -1553,6 +1683,18 @@
         if (event.key === 'Enter') {
           event.preventDefault();
           runRequestSearch(vitrineSearchInput.value);
+        }
+      });
+    }
+
+    if (precheckSearchBtn && precheckSearchInput) {
+      precheckSearchBtn.addEventListener('click', () => {
+        runPrecheckSearch(precheckSearchInput.value);
+      });
+      precheckSearchInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          runPrecheckSearch(precheckSearchInput.value);
         }
       });
     }
