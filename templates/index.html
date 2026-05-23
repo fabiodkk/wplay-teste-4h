@@ -861,7 +861,7 @@
     }
 
     .carousel-nav[disabled] {
-      opacity: .28;
+      opacity: .62;
       cursor: not-allowed;
       filter: none;
     }
@@ -883,27 +883,14 @@
       box-shadow: 0 10px 26px rgba(0, 0, 0, .62);
     }
 
-    .carousel-nav::before {
+    .carousel-icon {
       display: block;
-      filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .45));
-    }
-
-    .carousel-nav.prev::before {
-      content: "❮";
-      margin-left: 2px;
-    }
-
-    .carousel-nav.next::before {
-      content: "❯";
-      margin-right: 0;
-    }
-
-    .nav-enabled .carousel-nav.next::before {
-      content: "›";
       color: #f3fdff;
       font-size: 54px;
       font-weight: 900;
       line-height: 1;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, .7);
+      user-select: none;
     }
 
     .vitrine.collapsed .vitrine-sub,
@@ -1293,8 +1280,8 @@
               </div>
               <p class="vitrine-search-status" id="precheckSearchStatus" aria-live="polite"></p>
               <div class="vitrine-viewport nav-enabled">
-                <button class="carousel-nav prev" id="precheckPrevBtn" type="button" aria-label="Voltar 3 resultados" title="Voltar 3 resultados" disabled></button>
-                <button class="carousel-nav next" id="precheckNextBtn" type="button" aria-label="Avancar 3 resultados" title="Avancar 3 resultados" disabled></button>
+                <button class="carousel-nav prev" id="precheckPrevBtn" type="button" aria-label="Voltar 3 resultados" title="Voltar 3 resultados" disabled><span class="carousel-icon">&lt;</span></button>
+                <button class="carousel-nav next" id="precheckNextBtn" type="button" aria-label="Avancar 3 resultados" title="Avancar 3 resultados" disabled><span class="carousel-icon">&gt;</span></button>
                 <div class="vitrine-track fast" id="precheckTrack" data-loop="false">
                   <article class="vitrine-card">
                     <img src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=900&q=80" alt="Busca de disponibilidade">
@@ -1324,8 +1311,8 @@
             </div>
             <p class="vitrine-search-status" id="vitrineSearchStatus" aria-live="polite"></p>
             <div class="vitrine-viewport nav-enabled">
-              <button class="carousel-nav prev" id="requestPrevBtn" type="button" aria-label="Voltar 3 resultados" title="Voltar 3 resultados" disabled></button>
-              <button class="carousel-nav next" id="requestNextBtn" type="button" aria-label="Avancar 3 resultados" title="Avancar 3 resultados" disabled></button>
+              <button class="carousel-nav prev" id="requestPrevBtn" type="button" aria-label="Voltar 3 resultados" title="Voltar 3 resultados" disabled><span class="carousel-icon">&lt;</span></button>
+              <button class="carousel-nav next" id="requestNextBtn" type="button" aria-label="Avancar 3 resultados" title="Avancar 3 resultados" disabled><span class="carousel-icon">&gt;</span></button>
               <div class="vitrine-track fast" id="vitrineTrackPedidos" data-loop="false">
                 {% if request_media %}
                   {% for item in request_media %}
