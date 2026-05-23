@@ -810,6 +810,10 @@
       align-items: center;
     }
 
+    #precheckTrack {
+      animation: none;
+    }
+
     .vitrine.collapsed .vitrine-sub,
     .vitrine.collapsed .vitrine-stack {
       display: none;
@@ -1454,6 +1458,7 @@
     const precheckSearchStatus = document.getElementById('precheckSearchStatus');
     let precheckItems = [];
     let precheckOffset = 0;
+    let precheckAutoTimer = null;
 
     function setupLoopTrack(track) {
       if (!track) return;
@@ -1579,6 +1584,31 @@
       }
     }
 
+    function stopPrecheckAutoAdvance() {
+      if (!precheckAutoTimer) return;
+      clearInterval(precheckAutoTimer);
+      precheckAutoTimer = null;
+    }
+
+    function startPrecheckAutoAdvance() {
+      stopPrecheckAutoAdvance();
+      if (precheckItems.length <= 3) return;
+      precheckAutoTimer = setInterval(() => {
+        precheckOffset += 3;
+        if (precheckOffset >= precheckItems.length) precheckOffset = 0;
+        renderPrecheckWindow();
+      }, 3000);
+    }
+
+    function jumpPrecheckByThree() {
+      if (!precheckItems.length || precheckItems.length <= 3) return;
+      precheckOffset += 3;
+      if (precheckOffset >= precheckItems.length) precheckOffset = 0;
+      renderPrecheckWindow();
+      // Reinicia o timer para evitar troca imediata apos clique manual.
+      startPrecheckAutoAdvance();
+    }
+
     async function runPrecheckSearch(searchValue) {
       if (!precheckTrack) return;
       const query = (searchValue || '').trim();
@@ -1610,6 +1640,7 @@
         if (!available.length) {
           precheckItems = [];
           precheckOffset = 0;
+          stopPrecheckAutoAdvance();
           precheckTrack.innerHTML = `
             <article class="vitrine-card">
               <img src="https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=900&q=80" alt="Sem disponibilidade para busca">
@@ -1631,11 +1662,13 @@
         precheckItems = available.slice(0, 24);
         precheckOffset = 0;
         renderPrecheckWindow();
+        startPrecheckAutoAdvance();
         if (precheckSearchStatus) {
           precheckSearchStatus.className = 'vitrine-search-status ok';
           precheckSearchStatus.textContent = `${available.length} resultado(s) disponivel(is) para "${query}".`;
         }
       } catch (_) {
+        stopPrecheckAutoAdvance();
         if (precheckSearchStatus) {
           precheckSearchStatus.className = 'vitrine-search-status err';
           precheckSearchStatus.textContent = 'Falha na consulta agora. Tente novamente em instantes.';
@@ -1728,10 +1761,7 @@
 
     if (precheckNextBtn) {
       precheckNextBtn.addEventListener('click', () => {
-        if (!precheckItems.length || precheckItems.length <= 3) return;
-        precheckOffset += 3;
-        if (precheckOffset >= precheckItems.length) precheckOffset = 0;
-        renderPrecheckWindow();
+        jumpPrecheckByThree();
       });
     }
 
