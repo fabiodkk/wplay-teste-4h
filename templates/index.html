@@ -834,62 +834,63 @@
       position: absolute;
       top: 50%;
       transform: translateY(-50%);
-      width: 46px;
-      height: 132px;
-      border-radius: 12px;
+      width: 52px;
+      height: 168px;
+      border-radius: 10px;
       border: 0;
       cursor: pointer;
       z-index: 8;
-      opacity: .92;
+      opacity: .58;
       transition: opacity .2s ease, filter .2s ease, background .2s ease;
-      background-color: rgba(3, 17, 30, .78);
+      background-color: transparent;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 0;
-      font-size: 48px;
-      font-weight: 900;
+      font-size: 44px;
+      font-weight: 700;
       line-height: 1;
-      color: rgba(242, 251, 255, 1);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
-      text-shadow: 0 2px 6px rgba(0, 0, 0, .7);
+      color: rgba(238, 248, 255, .92);
+      box-shadow: none;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, .55);
     }
 
     .carousel-nav:hover {
-      opacity: .96;
+      opacity: .92;
       filter: brightness(1.12);
     }
 
     .carousel-nav[disabled] {
-      opacity: .62;
+      opacity: .28;
       cursor: not-allowed;
       filter: none;
     }
 
     .carousel-nav.prev {
       left: 10px;
+      background: linear-gradient(to right, rgba(3, 17, 30, .58), rgba(3, 17, 30, .08), transparent);
     }
 
     .carousel-nav.next {
       right: 10px;
+      background: linear-gradient(to left, rgba(3, 17, 30, .58), rgba(3, 17, 30, .08), transparent);
     }
 
     .nav-enabled .carousel-nav.next {
-      right: 8px !important;
+      right: 10px !important;
       z-index: 30 !important;
-      opacity: 1 !important;
-      background-color: rgba(3, 17, 30, .92) !important;
-      border: 1px solid rgba(123, 228, 255, .5);
-      box-shadow: 0 10px 26px rgba(0, 0, 0, .62);
+      opacity: .58 !important;
+      border: 0;
+      box-shadow: none;
     }
 
     .carousel-icon {
       display: block;
-      color: #f3fdff;
-      font-size: 54px;
-      font-weight: 900;
+      color: rgba(240, 251, 255, .96);
+      font-size: 52px;
+      font-weight: 700;
       line-height: 1;
-      text-shadow: 0 2px 6px rgba(0, 0, 0, .7);
+      text-shadow: 0 2px 6px rgba(0, 0, 0, .62);
       user-select: none;
     }
 
