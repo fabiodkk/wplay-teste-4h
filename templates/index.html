@@ -814,32 +814,55 @@
       animation: none;
     }
 
-    .precheck-next-btn {
-      width: 36px;
-      min-width: 36px;
-      height: 36px;
-      border-radius: 999px;
-      padding: 0;
-      font-size: 22px;
-      line-height: 1;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid rgba(255, 255, 255, .28);
-      background: linear-gradient(145deg, rgba(7, 38, 62, .95), rgba(10, 95, 122, .9));
-      color: #e9f8ff;
-      box-shadow: 0 8px 18px rgba(0, 0, 0, .28);
+    #vitrineTrackPedidos {
+      animation: none;
     }
 
-    .precheck-next-btn:hover {
-      transform: translateY(-1px) scale(1.03);
-      filter: brightness(1.1);
+    .nav-enabled {
+      position: relative;
+      padding: 0 54px;
+      min-height: 220px;
     }
 
-    .precheck-next-btn[disabled] {
-      opacity: .45;
-      box-shadow: none;
-      transform: none;
+    .carousel-nav {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 54px;
+      border: 0;
+      cursor: pointer;
+      z-index: 3;
+      opacity: .42;
+      transition: opacity .2s ease, filter .2s ease;
+      background-color: transparent;
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 34px 34px;
+    }
+
+    .carousel-nav:hover {
+      opacity: .92;
+      filter: brightness(1.12);
+    }
+
+    .carousel-nav[disabled] {
+      opacity: .16;
+      cursor: not-allowed;
+      filter: none;
+    }
+
+    .carousel-nav.prev {
+      left: 0;
+      background-image:
+        linear-gradient(to right, rgba(3, 17, 30, .82), rgba(3, 17, 30, .18), transparent),
+        url("{{ url_for('static', filename='images/arrow-left.png') }}");
+    }
+
+    .carousel-nav.next {
+      right: 0;
+      background-image:
+        linear-gradient(to left, rgba(3, 17, 30, .82), rgba(3, 17, 30, .18), transparent),
+        url("{{ url_for('static', filename='images/arrow-right.png') }}");
     }
 
     .vitrine.collapsed .vitrine-sub,
@@ -1225,18 +1248,12 @@
                     >
                     <button class="vitrine-search-btn" id="precheckSearchBtn" type="button">Buscar</button>
                   </div>
-                  <button
-                    class="vitrine-search-btn precheck-next-btn"
-                    id="precheckNextBtn"
-                    type="button"
-                    aria-label="Avancar 3 resultados"
-                    title="Avancar 3 resultados"
-                    disabled
-                  >›</button>
                 </div>
               </div>
               <p class="vitrine-search-status" id="precheckSearchStatus" aria-live="polite"></p>
-              <div class="vitrine-viewport">
+              <div class="vitrine-viewport nav-enabled">
+                <button class="carousel-nav prev" id="precheckPrevBtn" type="button" aria-label="Voltar 3 resultados" title="Voltar 3 resultados" disabled></button>
+                <button class="carousel-nav next" id="precheckNextBtn" type="button" aria-label="Avancar 3 resultados" title="Avancar 3 resultados" disabled></button>
                 <div class="vitrine-track fast" id="precheckTrack" data-loop="false">
                   <article class="vitrine-card">
                     <img src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=900&q=80" alt="Busca de disponibilidade">
@@ -1265,8 +1282,10 @@
               </div>
             </div>
             <p class="vitrine-search-status" id="vitrineSearchStatus" aria-live="polite"></p>
-            <div class="vitrine-viewport">
-              <div class="vitrine-track fast" id="vitrineTrackPedidos" data-loop="true">
+            <div class="vitrine-viewport nav-enabled">
+              <button class="carousel-nav prev" id="requestPrevBtn" type="button" aria-label="Voltar 3 resultados" title="Voltar 3 resultados" disabled></button>
+              <button class="carousel-nav next" id="requestNextBtn" type="button" aria-label="Avancar 3 resultados" title="Avancar 3 resultados" disabled></button>
+              <div class="vitrine-track fast" id="vitrineTrackPedidos" data-loop="false">
                 {% if request_media %}
                   {% for item in request_media %}
                     <article class="vitrine-card">
@@ -1489,11 +1508,17 @@
     const precheckTrack = document.getElementById('precheckTrack');
     const precheckSearchInput = document.getElementById('precheckSearchInput');
     const precheckSearchBtn = document.getElementById('precheckSearchBtn');
+    const precheckPrevBtn = document.getElementById('precheckPrevBtn');
     const precheckNextBtn = document.getElementById('precheckNextBtn');
     const precheckSearchStatus = document.getElementById('precheckSearchStatus');
+    const requestPrevBtn = document.getElementById('requestPrevBtn');
+    const requestNextBtn = document.getElementById('requestNextBtn');
+    const PAGE_SIZE = 3;
     let precheckItems = [];
     let precheckOffset = 0;
     let precheckAutoTimer = null;
+    let requestItemsHtml = [];
+    let requestOffset = 0;
 
     function setupLoopTrack(track) {
       if (!track) return;
@@ -1608,15 +1633,26 @@
       `;
     }
 
+    function shiftPageOffset(offset, total, direction) {
+      if (total <= PAGE_SIZE) return 0;
+      let next = offset + (direction * PAGE_SIZE);
+      if (next >= total) return 0;
+      if (next < 0) {
+        const rem = total % PAGE_SIZE;
+        return rem === 0 ? total - PAGE_SIZE : total - rem;
+      }
+      return next;
+    }
+
     function renderPrecheckWindow() {
       if (!precheckTrack) return;
       if (!precheckItems.length) return;
-      const windowItems = precheckItems.slice(precheckOffset, precheckOffset + 3);
+      const windowItems = precheckItems.slice(precheckOffset, precheckOffset + PAGE_SIZE);
       precheckTrack.innerHTML = windowItems.map(buildAvailabilityCard).join('');
       precheckTrack.dataset.originalHtml = precheckTrack.innerHTML;
-      if (precheckNextBtn) {
-        precheckNextBtn.disabled = precheckItems.length <= 3;
-      }
+      const disable = precheckItems.length <= PAGE_SIZE;
+      if (precheckNextBtn) precheckNextBtn.disabled = disable;
+      if (precheckPrevBtn) precheckPrevBtn.disabled = disable;
     }
 
     function stopPrecheckAutoAdvance() {
@@ -1627,21 +1663,65 @@
 
     function startPrecheckAutoAdvance() {
       stopPrecheckAutoAdvance();
-      if (precheckItems.length <= 3) return;
+      if (precheckItems.length <= PAGE_SIZE) return;
       precheckAutoTimer = setInterval(() => {
-        precheckOffset += 3;
-        if (precheckOffset >= precheckItems.length) precheckOffset = 0;
+        precheckOffset = shiftPageOffset(precheckOffset, precheckItems.length, 1);
         renderPrecheckWindow();
       }, 3000);
     }
 
-    function jumpPrecheckByThree() {
-      if (!precheckItems.length || precheckItems.length <= 3) return;
-      precheckOffset += 3;
-      if (precheckOffset >= precheckItems.length) precheckOffset = 0;
+    function jumpPrecheck(direction) {
+      if (!precheckItems.length || precheckItems.length <= PAGE_SIZE) return;
+      precheckOffset = shiftPageOffset(precheckOffset, precheckItems.length, direction);
       renderPrecheckWindow();
       // Reinicia o timer para evitar troca imediata apos clique manual.
       startPrecheckAutoAdvance();
+    }
+
+    function renderRequestWindow() {
+      if (!vitrineTrackPedidos) return;
+      if (!requestItemsHtml.length) return;
+      const windowItems = requestItemsHtml.slice(requestOffset, requestOffset + PAGE_SIZE);
+      vitrineTrackPedidos.innerHTML = windowItems.join('');
+      vitrineTrackPedidos.dataset.originalHtml = vitrineTrackPedidos.innerHTML;
+      const disable = requestItemsHtml.length <= PAGE_SIZE;
+      if (requestNextBtn) requestNextBtn.disabled = disable;
+      if (requestPrevBtn) requestPrevBtn.disabled = disable;
+    }
+
+    function jumpRequest(direction) {
+      if (!requestItemsHtml.length || requestItemsHtml.length <= PAGE_SIZE) return;
+      requestOffset = shiftPageOffset(requestOffset, requestItemsHtml.length, direction);
+      renderRequestWindow();
+    }
+
+    function bindPressAndHold(button, action) {
+      if (!button) return;
+      let holdTimer = null;
+      let holdInterval = null;
+      const stop = () => {
+        if (holdTimer) {
+          clearTimeout(holdTimer);
+          holdTimer = null;
+        }
+        if (holdInterval) {
+          clearInterval(holdInterval);
+          holdInterval = null;
+        }
+      };
+      const start = (event) => {
+        event.preventDefault();
+        action();
+        holdTimer = setTimeout(() => {
+          holdInterval = setInterval(action, 1000);
+        }, 260);
+      };
+      button.addEventListener('mousedown', start);
+      button.addEventListener('touchstart', start, { passive: false });
+      button.addEventListener('mouseup', stop);
+      button.addEventListener('mouseleave', stop);
+      button.addEventListener('touchend', stop);
+      button.addEventListener('touchcancel', stop);
     }
 
     async function runPrecheckSearch(searchValue) {
@@ -1687,6 +1767,7 @@
           `;
           precheckTrack.dataset.originalHtml = precheckTrack.innerHTML;
           if (precheckNextBtn) precheckNextBtn.disabled = true;
+          if (precheckPrevBtn) precheckPrevBtn.disabled = true;
           if (precheckSearchStatus) {
             precheckSearchStatus.className = 'vitrine-search-status err';
             precheckSearchStatus.textContent = `Sem resultado no catalogo para "${query}".`;
@@ -1741,7 +1822,7 @@
         const items = Array.isArray(data.merged_items) ? data.merged_items : [];
 
         if (!items.length) {
-          vitrineTrackPedidos.innerHTML = `
+          requestItemsHtml = [`
             <article class="vitrine-card">
               <img src="https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=900&q=80" alt="Sem resultado para busca">
               <div class="vitrine-meta">
@@ -1749,16 +1830,16 @@
                 <span class="vitrine-tag">Esse titulo pode ja estar no catalogo</span>
               </div>
             </article>
-          `;
-          vitrineTrackPedidos.dataset.originalHtml = vitrineTrackPedidos.innerHTML;
-          setupLoopTrack(vitrineTrackPedidos);
+          `];
+          requestOffset = 0;
+          renderRequestWindow();
           setSearchStatus(`Nada pendente para "${query}". Se quiser, tente outro nome.`, 'ok');
           return;
         }
 
-        vitrineTrackPedidos.innerHTML = items.map(buildRequestCard).join('');
-        vitrineTrackPedidos.dataset.originalHtml = vitrineTrackPedidos.innerHTML;
-        setupLoopTrack(vitrineTrackPedidos);
+        requestItemsHtml = items.map(buildRequestCard);
+        requestOffset = 0;
+        renderRequestWindow();
         setSearchStatus(`${items.length} sugestoes para "${query}".`, resp.ok ? 'ok' : 'err');
       } catch (_) {
         setSearchStatus('Falha na busca agora. Tente novamente em instantes.', 'err');
@@ -1795,9 +1876,28 @@
     }
 
     if (precheckNextBtn) {
-      precheckNextBtn.addEventListener('click', () => {
-        jumpPrecheckByThree();
-      });
+      bindPressAndHold(precheckNextBtn, () => jumpPrecheck(1));
+    }
+
+    if (precheckPrevBtn) {
+      bindPressAndHold(precheckPrevBtn, () => jumpPrecheck(-1));
+    }
+
+    if (requestNextBtn) {
+      bindPressAndHold(requestNextBtn, () => jumpRequest(1));
+    }
+
+    if (requestPrevBtn) {
+      bindPressAndHold(requestPrevBtn, () => jumpRequest(-1));
+    }
+
+    if (vitrineTrackPedidos) {
+      const baseline = vitrineTrackPedidos.dataset.originalHtml || vitrineTrackPedidos.innerHTML;
+      const holder = document.createElement('div');
+      holder.innerHTML = baseline;
+      requestItemsHtml = Array.from(holder.children).map((el) => el.outerHTML);
+      requestOffset = 0;
+      renderRequestWindow();
     }
 
     document.addEventListener('click', async (event) => {
