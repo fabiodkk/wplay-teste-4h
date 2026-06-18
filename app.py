@@ -258,6 +258,13 @@ def gerar():
         }
         info_msg = "Teste liberado com sucesso. Agora e so configurar e aproveitar."
     else:
+        app.logger.warning(
+            "Geracao de acesso falhou para IP %s: error=%s login_status=%s test_status=%s",
+            client_ip,
+            result.get("error", ""),
+            result.get("login_status", ""),
+            result.get("test_status", ""),
+        )
         error_msg = "Nao conseguimos liberar agora. Tente novamente em instantes ou fale com nosso time no WhatsApp."
 
     limit_info = safe_check_ip_limits(client_ip)
@@ -287,14 +294,19 @@ def api_recentes():
     client_ip = get_client_ip(request)
     bearer = extract_bearer_from_request(request)
     preferred_user_id = (request.args.get("user_id") or request.headers.get("X-Mcapi-User-Id") or "").strip()
-    result = fetch_recent_streams_for_user(
-        provided_bearer=bearer,
-        preferred_user_id=preferred_user_id,
-        movies_limit=20,
-        channels_limit=20,
-        client_ip=client_ip,
-        allow_shared_fallback=True,
-    )
+    try:
+        result = fetch_recent_streams_for_user(
+            provided_bearer=bearer,
+            preferred_user_id=preferred_user_id,
+            movies_limit=20,
+            channels_limit=20,
+            client_ip=client_ip,
+            allow_shared_fallback=True,
+        )
+    except Exception:
+        app.logger.exception("Falha ao buscar recentes para IP %s", client_ip)
+        return {"ok": False, "error": "Recentes temporariamente indisponiveis.", "merged": []}, 503
+
     status_code = 200 if result.get("ok") else 400
     return result, status_code
 
@@ -306,16 +318,21 @@ def api_solicitacoes():
     preferred_user_id = (request.args.get("user_id") or request.headers.get("X-Mcapi-User-Id") or "").strip()
     search_query = (request.args.get("query") or request.args.get("search") or "ss").strip() or "ss"
 
-    result = fetch_catalog_request_tracks_for_user(
-        provided_bearer=bearer,
-        preferred_user_id=preferred_user_id,
-        search_query=search_query,
-        findall_limit=18,
-        tmdb_limit=18,
-        merged_limit=24,
-        client_ip=client_ip,
-        allow_shared_fallback=True,
-    )
+    try:
+        result = fetch_catalog_request_tracks_for_user(
+            provided_bearer=bearer,
+            preferred_user_id=preferred_user_id,
+            search_query=search_query,
+            findall_limit=18,
+            tmdb_limit=18,
+            merged_limit=24,
+            client_ip=client_ip,
+            allow_shared_fallback=True,
+        )
+    except Exception:
+        app.logger.exception("Falha ao buscar solicitacoes para IP %s", client_ip)
+        return {"ok": False, "error": "Busca temporariamente indisponivel.", "merged_items": []}, 503
+
     status_code = 200 if result.get("ok") else 400
     return result, status_code
 
@@ -339,17 +356,22 @@ def api_pedir_conteudo():
     if content_type not in {"filme", "serie", "canal"}:
         content_type = "filme"
 
-    result = submit_content_request_for_user(
-        provided_bearer=bearer,
-        preferred_user_id=preferred_user_id,
-        content_name=content_name,
-        content_type=content_type,
-        tmdb_id=tmdb_id,
-        img_url=img_url,
-        user_id=user_id,
-        client_ip=client_ip,
-        allow_shared_fallback=True,
-    )
+    try:
+        result = submit_content_request_for_user(
+            provided_bearer=bearer,
+            preferred_user_id=preferred_user_id,
+            content_name=content_name,
+            content_type=content_type,
+            tmdb_id=tmdb_id,
+            img_url=img_url,
+            user_id=user_id,
+            client_ip=client_ip,
+            allow_shared_fallback=True,
+        )
+    except Exception:
+        app.logger.exception("Falha ao enviar pedido de conteudo para IP %s", client_ip)
+        return {"ok": False, "error": "Pedido temporariamente indisponivel."}, 503
+
     status_code = result.get("status_code") if isinstance(result.get("status_code"), int) else None
     if status_code is None:
         status_code = 200 if result.get("ok") else 400
