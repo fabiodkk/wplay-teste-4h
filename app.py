@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from flask import Flask, render_template, request
+from flask import Flask, redirect, render_template, request, url_for
 from automate_mcapi import (
     add_ip_liberado,
     check_ip_limits,
@@ -144,6 +144,12 @@ def index():
     )
 
 
+@app.get("/gerar")
+def gerar_get():
+    return redirect(url_for("index"))
+
+
+@app.post("/")
 @app.post("/gerar")
 def gerar():
     client_ip = get_client_ip(request)
