@@ -43,6 +43,13 @@ def to_brasilia(iso_date: str) -> str:
     return dt.astimezone(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S")
 
 
+def safe_to_brasilia(iso_date: str) -> str:
+    try:
+        return to_brasilia(iso_date)
+    except Exception:
+        return iso_date or ""
+
+
 def get_client_ip(req) -> str:
     forwarded = req.headers.get("X-Forwarded-For", "").strip()
     if forwarded:
@@ -174,19 +181,28 @@ def gerar():
             form_telegram_id=telegram_id,
         )
 
-    active_access = get_active_access_for_ip(client_ip)
+    try:
+        active_access = get_active_access_for_ip(client_ip)
+    except Exception:
+        app.logger.exception("Falha ao consultar acesso ativo para IP %s", client_ip)
+        active_access = None
+
     if active_access:
-        register_usuario_criado_ip(
-            client_ip=client_ip,
-            username=active_access.get("username", ""),
-            telefone=telefone,
-            telegram_id=telegram_id,
-            exp_date_text=active_access.get("exp_date", ""),
-        )
+        try:
+            register_usuario_criado_ip(
+                client_ip=client_ip,
+                username=active_access.get("username", ""),
+                telefone=telefone,
+                telegram_id=telegram_id,
+                exp_date_text=active_access.get("exp_date", ""),
+            )
+        except Exception:
+            app.logger.exception("Falha ao registrar reutilizacao de acesso para IP %s", client_ip)
+
         basic = {
             "username": active_access.get("username", ""),
             "password": active_access.get("password", ""),
-            "exp_date_brasilia": to_brasilia(active_access.get("exp_date", "")),
+            "exp_date_brasilia": safe_to_brasilia(active_access.get("exp_date", "")),
         }
         return render_template(
             "index.html",
@@ -221,7 +237,15 @@ def gerar():
             form_telegram_id=telegram_id,
         )
 
-    result = generate_access_once(client_ip=client_ip, telefone=telefone, telegram_id=telegram_id)
+    try:
+        result = generate_access_once(client_ip=client_ip, telefone=telefone, telegram_id=telegram_id)
+    except Exception:
+        app.logger.exception("Falha inesperada ao gerar acesso para IP %s", client_ip)
+        result = {
+            "ok": False,
+            "error": "Falha inesperada ao gerar acesso.",
+        }
+
     basic = None
     error_msg = ""
     info_msg = ""
@@ -230,7 +254,7 @@ def gerar():
         basic = {
             "username": test_response.get("username", ""),
             "password": test_response.get("password", ""),
-            "exp_date_brasilia": to_brasilia(test_response.get("exp_date", "")),
+            "exp_date_brasilia": safe_to_brasilia(test_response.get("exp_date", "")),
         }
         info_msg = "Teste liberado com sucesso. Agora e so configurar e aproveitar."
     else:
