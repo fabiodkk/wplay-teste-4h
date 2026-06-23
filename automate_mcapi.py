@@ -35,6 +35,8 @@ KIRVANO_ACCESS_EVENTS = {"SALE_APPROVED", "SUBSCRIPTION_RENEWED"}
 KIRVANO_APPROVED_STATUSES = {"APPROVED", "PAID", "COMPLETED"}
 MEMORY_TOKEN_LOCK = threading.Lock()
 MEMORY_TOKEN_CACHE = {"token": None, "expires_at": None}
+MEMORY_WEBHOOK_LOCK = threading.Lock()
+MEMORY_WEBHOOK_RESULTS = {}
 
 LOGIN_HEADERS = {
     "accept": "application/json, text/plain, */*",
@@ -1913,21 +1915,28 @@ def process_kirvano_webhook(payload: dict) -> dict:
                 "db_available": False,
             }
 
-        lead_key = sale_id or checkout_id or webhook_key
-        result = generate_access_once(
-            client_ip=f"kirvano:{lead_key}",
-            telefone=customer["phone"],
-            telegram_id=customer["telegram_id"],
-        )
-        public_result = build_kirvano_public_result(result)
-        return {
-            **public_result,
-            "webhook_key": webhook_key,
-            "event": event,
-            "sale_id": sale_id,
-            "checkout_id": checkout_id,
-            "db_available": False,
-        }
+        with MEMORY_WEBHOOK_LOCK:
+            cached_result = MEMORY_WEBHOOK_RESULTS.get(webhook_key)
+            if cached_result:
+                return {**cached_result, "duplicate": True, "action": "already_processed"}
+
+            lead_key = sale_id or checkout_id or webhook_key
+            result = generate_access_once(
+                client_ip=f"kirvano:{lead_key}",
+                telefone=customer["phone"],
+                telegram_id=customer["telegram_id"],
+            )
+            public_result = {
+                **build_kirvano_public_result(result),
+                "webhook_key": webhook_key,
+                "event": event,
+                "sale_id": sale_id,
+                "checkout_id": checkout_id,
+                "db_available": False,
+            }
+            if public_result.get("ok"):
+                MEMORY_WEBHOOK_RESULTS[webhook_key] = public_result
+            return public_result
 
     try:
         with conn.cursor() as cur:
