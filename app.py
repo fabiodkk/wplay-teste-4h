@@ -1,4 +1,5 @@
 import os
+import hmac
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from flask import Flask, redirect, render_template, request, url_for
@@ -10,6 +11,7 @@ from automate_mcapi import (
     generate_access_once,
     get_active_access_for_ip,
     list_ip_liberados,
+    process_kirvano_webhook,
     register_usuario_criado_ip,
     remove_ip_liberado,
     submit_content_request_for_user,
@@ -65,6 +67,32 @@ def extract_bearer_from_request(req) -> str:
     if auth.lower().startswith("bearer "):
         return auth.split(" ", 1)[1].strip()
     return (req.args.get("bearer") or "").strip()
+
+
+def extract_kirvano_token(req, payload=None) -> str:
+    auth = (req.headers.get("Authorization") or "").strip()
+    if auth.lower().startswith("bearer "):
+        return auth.split(" ", 1)[1].strip()
+
+    for header_name in ("X-Kirvano-Token", "X-Webhook-Token", "X-Token", "Token"):
+        token = (req.headers.get(header_name) or "").strip()
+        if token:
+            return token
+
+    if isinstance(payload, dict):
+        token = str(payload.get("token") or "").strip()
+        if token:
+            return token
+
+    return (req.args.get("token") or "").strip()
+
+
+def kirvano_token_is_valid(req, payload=None) -> bool:
+    expected = (os.getenv("KIRVANO_WEBHOOK_TOKEN") or "").strip()
+    if not expected:
+        return True
+    received = extract_kirvano_token(req, payload=payload)
+    return hmac.compare_digest(received, expected)
 
 
 def safe_recent_media(req, client_ip: str):
@@ -154,6 +182,38 @@ def index():
 @app.get("/gerar")
 def gerar_get():
     return redirect(url_for("index"))
+
+
+@app.get("/liberado")
+def liberado_health():
+    return {"ok": True, "service": "kirvano-webhook", "events": ["SALE_APPROVED", "SUBSCRIPTION_RENEWED"]}, 200
+
+
+@app.post("/liberado")
+def liberado_webhook():
+    payload = request.get_json(silent=True)
+    if payload is None and request.form:
+        payload = request.form.to_dict(flat=True)
+
+    if payload is None:
+        payload = {}
+
+    if not kirvano_token_is_valid(request, payload=payload):
+        return {"ok": False, "error": "Token invalido."}, 401
+
+    if not payload:
+        return {"ok": True, "service": "kirvano-webhook", "message": "Endpoint ativo."}, 200
+
+    try:
+        result = process_kirvano_webhook(payload)
+    except Exception:
+        app.logger.exception("Falha ao processar webhook Kirvano")
+        return {"ok": False, "error": "Falha ao processar webhook."}, 500
+
+    status_code = 200
+    if not result.get("ok") and result.get("event") in {"SALE_APPROVED", "SUBSCRIPTION_RENEWED"}:
+        status_code = 500
+    return result, status_code
 
 
 @app.post("/")

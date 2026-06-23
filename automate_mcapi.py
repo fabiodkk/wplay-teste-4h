@@ -1,10 +1,12 @@
 import base64
+import hashlib
 import json
 import os
 import random
 import socket
 import string
 import unicodedata
+from urllib.parse import parse_qsl, unquote, urlparse
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -28,6 +30,8 @@ TMDB_DEFAULT_BEARER_TOKEN = (
 TMDB_DEFAULT_API_KEY = "f0e6d11d9ee877ebe8251bbbb3178b55"
 BRAZIL_TZ = ZoneInfo("America/Sao_Paulo")
 TOKEN_LOCK_KEY = 92745131
+KIRVANO_ACCESS_EVENTS = {"SALE_APPROVED", "SUBSCRIPTION_RENEWED"}
+KIRVANO_APPROVED_STATUSES = {"APPROVED", "PAID", "COMPLETED"}
 
 LOGIN_HEADERS = {
     "accept": "application/json, text/plain, */*",
@@ -138,13 +142,57 @@ def connect_with_ipv4_fallback(conn_kwargs: dict):
         return psycopg2.connect(**conn_kwargs)
 
 
+def db_url_to_conn_kwargs(database_url: str) -> dict:
+    parsed = urlparse(database_url)
+    if not parsed.scheme or not parsed.hostname:
+        raise RuntimeError("DATABASE_URL/SUPABASE_DB_URL invalida.")
+
+    query = dict(parse_qsl(parsed.query))
+    kwargs = {
+        "host": parsed.hostname,
+        "port": parsed.port or int(query.pop("port", 5432)),
+        "dbname": unquote(parsed.path.lstrip("/") or "postgres"),
+        "user": unquote(parsed.username or "postgres"),
+        "password": unquote(parsed.password or ""),
+        "sslmode": query.pop("sslmode", os.getenv("SUPABASE_DB_SSLMODE", "require")),
+    }
+    kwargs.update(query)
+    return kwargs
+
+
 def connect_db(
     db_password: str,
     project_ref: str,
     project_region: str = "",
     pooler_host_override: str = "",
     pooler_port_override: str = "",
+    database_url: str = "",
+    db_host_override: str = "",
+    db_port_override: str = "",
+    db_name_override: str = "",
+    db_user_override: str = "",
+    db_sslmode: str = "require",
 ):
+    if database_url:
+        return connect_with_ipv4_fallback(db_url_to_conn_kwargs(database_url))
+
+    if db_host_override:
+        host_user = db_user_override or ("postgres" if db_host_override.startswith("db.") else f"postgres.{project_ref}")
+        host_kwargs = {
+            "host": db_host_override,
+            "port": int(db_port_override or 5432),
+            "dbname": db_name_override or "postgres",
+            "user": host_user,
+            "password": db_password,
+            "sslmode": db_sslmode or "require",
+        }
+        return connect_with_ipv4_fallback(host_kwargs)
+
+    if not project_ref:
+        raise RuntimeError(
+            "Informe SUPABASE_PROJECT_REF, SUPABASE_DB_HOST ou DATABASE_URL/SUPABASE_DB_URL para conectar ao banco."
+        )
+
     direct_host = f"db.{project_ref}.supabase.co"
     direct_kwargs = {
         "host": direct_host,
@@ -263,6 +311,30 @@ def ensure_schema(conn):
             """
         )
         cur.execute(
+            """
+            create table if not exists public.kirvano_webhooks (
+              id bigserial primary key,
+              webhook_key text not null unique,
+              event text not null,
+              sale_id text,
+              checkout_id text,
+              status text,
+              customer_name text,
+              customer_email text,
+              customer_phone text,
+              access_username text,
+              access_password text,
+              access_exp_date timestamptz,
+              request_payload jsonb,
+              result_payload jsonb,
+              processed_at timestamptz,
+              error_message text,
+              created_at timestamptz not null default now(),
+              updated_at timestamptz not null default now()
+            );
+            """
+        )
+        cur.execute(
             "create index if not exists idx_mcapi_events_event_ip_created on public.mcapi_events (event_type, client_ip, created_at desc);"
         )
         cur.execute(
@@ -273,6 +345,12 @@ def ensure_schema(conn):
         )
         cur.execute(
             "create index if not exists idx_mcapi_user_token_cache_updated on public.mcapi_user_token_cache (updated_at desc);"
+        )
+        cur.execute(
+            "create index if not exists idx_kirvano_webhooks_event_created on public.kirvano_webhooks (event, created_at desc);"
+        )
+        cur.execute(
+            "create index if not exists idx_kirvano_webhooks_sale_id on public.kirvano_webhooks (sale_id);"
         )
     conn.commit()
 
@@ -285,20 +363,46 @@ def load_config():
     supabase_access_token = os.getenv("SUPABASE_ACCESS_TOKEN")
     supabase_project_name = os.getenv("SUPABASE_PROJECT_NAME")
     supabase_db_password = os.getenv("SUPABASE_DB_PASSWORD")
+    database_url = os.getenv("DATABASE_URL") or os.getenv("SUPABASE_DB_URL") or ""
+    supabase_db_host = os.getenv("SUPABASE_DB_HOST", "")
+    supabase_db_port = os.getenv("SUPABASE_DB_PORT", "")
+    supabase_db_name = os.getenv("SUPABASE_DB_NAME", "postgres")
+    supabase_db_user = os.getenv("SUPABASE_DB_USER", "")
+    supabase_db_sslmode = os.getenv("SUPABASE_DB_SSLMODE", "require")
 
-    if not all([mc_username, mc_password, supabase_access_token, supabase_project_name, supabase_db_password]):
-        raise RuntimeError("Variaveis faltando no .env. Confira o arquivo.")
+    if not all([mc_username, mc_password]):
+        raise RuntimeError("Variaveis MC_USERNAME/MC_PASSWORD faltando no .env ou no Render.")
 
     project_ref = os.getenv("SUPABASE_PROJECT_REF")
     project_region = os.getenv("SUPABASE_PROJECT_REGION", "")
     supabase_pooler_host = os.getenv("SUPABASE_POOLER_HOST", "")
     supabase_pooler_port = os.getenv("SUPABASE_POOLER_PORT", "")
-    if not project_ref or not project_region:
-        project_info = get_supabase_project_info(supabase_access_token, supabase_project_name)
-        if not project_ref:
-            project_ref = project_info["ref"]
-        if not project_region:
-            project_region = project_info.get("region", "")
+
+    if not database_url and not supabase_db_host and not supabase_db_password:
+        raise RuntimeError("Informe SUPABASE_DB_PASSWORD ou DATABASE_URL/SUPABASE_DB_URL no .env ou no Render.")
+
+    if not database_url and not supabase_db_host:
+        if not project_ref and supabase_access_token and supabase_project_name:
+            try:
+                project_info = get_supabase_project_info(supabase_access_token, supabase_project_name)
+            except Exception as exc:
+                raise RuntimeError(
+                    "Nao foi possivel consultar o projeto pelo SUPABASE_ACCESS_TOKEN. "
+                    "Configure SUPABASE_PROJECT_REF no Render/.env para nao depender desse token administrativo."
+                ) from exc
+            if not project_ref:
+                project_ref = project_info["ref"]
+            if not project_region:
+                project_region = project_info.get("region", "")
+        elif not project_ref:
+            raise RuntimeError(
+                "Informe SUPABASE_PROJECT_REF, SUPABASE_DB_HOST ou DATABASE_URL/SUPABASE_DB_URL no .env ou no Render."
+            )
+        elif not project_region and supabase_access_token and supabase_project_name:
+            try:
+                project_region = get_supabase_project_info(supabase_access_token, supabase_project_name).get("region", "")
+            except Exception:
+                project_region = ""
 
     return {
         "mc_username": mc_username,
@@ -308,6 +412,12 @@ def load_config():
         "supabase_pooler_host": supabase_pooler_host,
         "supabase_pooler_port": supabase_pooler_port,
         "supabase_db_password": supabase_db_password,
+        "database_url": database_url,
+        "supabase_db_host": supabase_db_host,
+        "supabase_db_port": supabase_db_port,
+        "supabase_db_name": supabase_db_name,
+        "supabase_db_user": supabase_db_user,
+        "supabase_db_sslmode": supabase_db_sslmode,
     }
 
 
@@ -319,6 +429,12 @@ def open_db_from_env():
         cfg.get("project_region", ""),
         cfg.get("supabase_pooler_host", ""),
         cfg.get("supabase_pooler_port", ""),
+        cfg.get("database_url", ""),
+        cfg.get("supabase_db_host", ""),
+        cfg.get("supabase_db_port", ""),
+        cfg.get("supabase_db_name", "postgres"),
+        cfg.get("supabase_db_user", ""),
+        cfg.get("supabase_db_sslmode", "require"),
     )
     ensure_schema(conn)
     return conn, cfg
@@ -1608,6 +1724,206 @@ def submit_content_request_for_user(
             "request_payload": request_payload,
             "response": response_payload,
         }
+    finally:
+        conn.close()
+
+
+def get_nested_value(data: dict, *path):
+    value = data
+    for key in path:
+        if not isinstance(value, dict):
+            return ""
+        value = value.get(key)
+    return value if value is not None else ""
+
+
+def make_kirvano_webhook_key(payload: dict) -> str:
+    event = str(payload.get("event") or "UNKNOWN").strip().upper()
+    sale_id = str(payload.get("sale_id") or "").strip()
+    checkout_id = str(payload.get("checkout_id") or "").strip()
+    created_at = str(payload.get("created_at") or get_nested_value(payload, "payment", "finished_at") or "").strip()
+
+    parts = [event, sale_id or checkout_id, created_at]
+    if any(parts[1:]):
+        return ":".join(part or "-" for part in parts)
+
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+    return f"{event}:{digest}"
+
+
+def extract_kirvano_customer(payload: dict) -> dict:
+    customer = payload.get("customer") if isinstance(payload.get("customer"), dict) else {}
+    metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+    custom_fields = payload.get("custom_fields") if isinstance(payload.get("custom_fields"), dict) else {}
+
+    telegram_id = (
+        customer.get("telegram_id")
+        or metadata.get("telegram_id")
+        or custom_fields.get("telegram_id")
+        or payload.get("telegram_id")
+        or ""
+    )
+
+    return {
+        "name": str(customer.get("name") or payload.get("customer_name") or "").strip(),
+        "email": str(customer.get("email") or payload.get("customer_email") or "").strip(),
+        "phone": str(customer.get("phone_number") or customer.get("phone") or payload.get("phone_number") or "").strip(),
+        "telegram_id": str(telegram_id or "").strip(),
+    }
+
+
+def build_kirvano_public_result(result: dict) -> dict:
+    test_response = result.get("test_response") if isinstance(result.get("test_response"), dict) else {}
+    username = test_response.get("username", "")
+    password = test_response.get("password", "")
+    ok = bool(result.get("ok") and username and password)
+    return {
+        "ok": ok,
+        "test_status": result.get("test_status"),
+        "token_from_cache": bool(result.get("token_from_cache")),
+        "access": {
+            "username": username,
+            "password": password,
+            "exp_date": test_response.get("exp_date", ""),
+        },
+        "error": result.get("error", "") if ok else result.get("error", "") or "MCAPI nao retornou usuario/senha.",
+    }
+
+
+def process_kirvano_webhook(payload: dict) -> dict:
+    if not isinstance(payload, dict):
+        return {"ok": False, "error": "Payload invalido."}
+
+    event = str(payload.get("event") or "").strip().upper()
+    status = str(payload.get("status") or "").strip().upper()
+    sale_id = str(payload.get("sale_id") or "").strip()
+    checkout_id = str(payload.get("checkout_id") or "").strip()
+    webhook_key = make_kirvano_webhook_key(payload)
+    customer = extract_kirvano_customer(payload)
+
+    conn, _ = open_db_from_env()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("select pg_advisory_lock(hashtext(%s));", (webhook_key,))
+
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    insert into public.kirvano_webhooks (
+                      webhook_key, event, sale_id, checkout_id, status,
+                      customer_name, customer_email, customer_phone,
+                      request_payload, updated_at
+                    )
+                    values (%s, %s, %s, %s, %s, %s, %s, %s, %s, now())
+                    on conflict (webhook_key)
+                    do update set
+                      status = excluded.status,
+                      customer_name = excluded.customer_name,
+                      customer_email = excluded.customer_email,
+                      customer_phone = excluded.customer_phone,
+                      request_payload = excluded.request_payload,
+                      updated_at = now()
+                    returning processed_at, access_username, access_password, access_exp_date, result_payload
+                    """,
+                    (
+                        webhook_key,
+                        event or "UNKNOWN",
+                        sale_id or None,
+                        checkout_id or None,
+                        status or None,
+                        customer["name"] or None,
+                        customer["email"] or None,
+                        customer["phone"] or None,
+                        Json(payload),
+                    ),
+                )
+                row = cur.fetchone()
+            conn.commit()
+
+            if row and row[0] and row[1]:
+                return {
+                    "ok": True,
+                    "duplicate": True,
+                    "action": "already_processed",
+                    "webhook_key": webhook_key,
+                    "event": event,
+                    "access": {
+                        "username": row[1],
+                        "password": row[2] or "",
+                        "exp_date": row[3].isoformat() if row[3] else "",
+                    },
+                }
+
+            if event not in KIRVANO_ACCESS_EVENTS or status not in KIRVANO_APPROVED_STATUSES:
+                ignored_result = {
+                    "ok": True,
+                    "action": "ignored",
+                    "reason": "Evento sem liberacao de acesso.",
+                    "event": event,
+                    "status": status,
+                }
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        update public.kirvano_webhooks
+                        set result_payload = %s,
+                            error_message = null,
+                            updated_at = now()
+                        where webhook_key = %s
+                        """,
+                        (Json(ignored_result), webhook_key),
+                    )
+                conn.commit()
+                return ignored_result
+
+            lead_key = sale_id or checkout_id or webhook_key
+            client_key = f"kirvano:{lead_key}"
+            result = generate_access_once(
+                client_ip=client_key,
+                telefone=customer["phone"],
+                telegram_id=customer["telegram_id"],
+            )
+            public_result = build_kirvano_public_result(result)
+            access = public_result["access"]
+            access_exp = parse_iso_to_utc(access.get("exp_date")) if access.get("exp_date") else None
+
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    update public.kirvano_webhooks
+                    set access_username = %s,
+                        access_password = %s,
+                        access_exp_date = %s,
+                        result_payload = %s,
+                        processed_at = case when %s then now() else processed_at end,
+                        error_message = %s,
+                        updated_at = now()
+                    where webhook_key = %s
+                    """,
+                    (
+                        access.get("username") or None,
+                        access.get("password") or None,
+                        access_exp,
+                        Json(public_result),
+                        bool(public_result["ok"]),
+                        None if public_result["ok"] else public_result.get("error") or "Falha ao gerar acesso.",
+                        webhook_key,
+                    ),
+                )
+            conn.commit()
+
+            return {
+                **public_result,
+                "webhook_key": webhook_key,
+                "event": event,
+                "sale_id": sale_id,
+                "checkout_id": checkout_id,
+            }
+        finally:
+            with conn.cursor() as cur:
+                cur.execute("select pg_advisory_unlock(hashtext(%s));", (webhook_key,))
+            conn.commit()
     finally:
         conn.close()
 
