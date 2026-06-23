@@ -5,6 +5,7 @@ import os
 import random
 import socket
 import string
+import threading
 import unicodedata
 from urllib.parse import parse_qsl, unquote, urlparse
 from datetime import datetime, timedelta, timezone
@@ -32,6 +33,8 @@ BRAZIL_TZ = ZoneInfo("America/Sao_Paulo")
 TOKEN_LOCK_KEY = 92745131
 KIRVANO_ACCESS_EVENTS = {"SALE_APPROVED", "SUBSCRIPTION_RENEWED"}
 KIRVANO_APPROVED_STATUSES = {"APPROVED", "PAID", "COMPLETED"}
+MEMORY_TOKEN_LOCK = threading.Lock()
+MEMORY_TOKEN_CACHE = {"token": None, "expires_at": None}
 
 LOGIN_HEADERS = {
     "accept": "application/json, text/plain, */*",
@@ -419,6 +422,15 @@ def load_config():
         "supabase_db_user": supabase_db_user,
         "supabase_db_sslmode": supabase_db_sslmode,
     }
+
+
+def load_mc_config():
+    load_dotenv()
+    mc_username = os.getenv("MC_USERNAME")
+    mc_password = os.getenv("MC_PASSWORD")
+    if not all([mc_username, mc_password]):
+        raise RuntimeError("Variaveis MC_USERNAME/MC_PASSWORD faltando no .env ou no Render.")
+    return {"mc_username": mc_username, "mc_password": mc_password}
 
 
 def open_db_from_env():
@@ -1195,6 +1207,90 @@ def get_or_refresh_shared_token(conn, cfg, client_ip: str = None, force_refresh:
             cur.execute("select pg_advisory_unlock(%s);", (TOKEN_LOCK_KEY,))
 
 
+def get_or_refresh_memory_token(cfg, force_refresh: bool = False):
+    with MEMORY_TOKEN_LOCK:
+        cached_token = MEMORY_TOKEN_CACHE.get("token")
+        cached_exp = MEMORY_TOKEN_CACHE.get("expires_at")
+        if not force_refresh and cached_token and token_is_valid(cached_exp):
+            return {
+                "ok": True,
+                "token": cached_token,
+                "expires_at": cached_exp,
+                "from_cache": True,
+            }
+
+        login_status, login_req, login_resp, token = login(cfg["mc_username"], cfg["mc_password"])
+        if login_status >= 400 or not token:
+            return {
+                "ok": False,
+                "token": None,
+                "expires_at": None,
+                "from_cache": False,
+                "login_status": login_status,
+                "login_response": login_resp,
+            }
+
+        expires_at = parse_jwt_exp_to_utc(token)
+        if not expires_at:
+            expires_at = datetime.now(timezone.utc) + timedelta(minutes=18)
+
+        MEMORY_TOKEN_CACHE["token"] = token
+        MEMORY_TOKEN_CACHE["expires_at"] = expires_at
+
+        return {
+            "ok": True,
+            "token": token,
+            "expires_at": expires_at,
+            "from_cache": False,
+            "login_status": login_status,
+            "login_response": login_resp,
+        }
+
+
+def generate_access_without_db(client_ip: str = None, telefone: str = "", telegram_id: str = "", db_error: str = ""):
+    cfg = load_mc_config()
+    token_info = get_or_refresh_memory_token(cfg, force_refresh=False)
+    if not token_info.get("ok"):
+        return {
+            "ok": False,
+            "login_status": token_info.get("login_status"),
+            "login_response": token_info.get("login_response"),
+            "error": "Falha ao obter token compartilhado em memoria.",
+            "storage": "memory",
+            "db_error": db_error,
+        }
+
+    token = token_info["token"]
+    lead_note = build_lead_note(telefone, telegram_id)
+    test_status, test_req, test_resp = create_test_line(token, note_text=lead_note)
+
+    if test_status in (401, 403):
+        token_info = get_or_refresh_memory_token(cfg, force_refresh=True)
+        if not token_info.get("ok"):
+            return {
+                "ok": False,
+                "login_status": token_info.get("login_status"),
+                "login_response": token_info.get("login_response"),
+                "error": "Token em memoria expirou e nao foi possivel renovar.",
+                "storage": "memory",
+                "db_error": db_error,
+            }
+        token = token_info["token"]
+        test_status, test_req, test_resp = create_test_line(token, note_text=lead_note)
+
+    return {
+        "ok": test_status < 400,
+        "login_status": token_info.get("login_status"),
+        "login_response": token_info.get("login_response"),
+        "bearer_token": token,
+        "test_status": test_status,
+        "test_response": test_resp,
+        "token_from_cache": token_info.get("from_cache", False),
+        "storage": "memory",
+        "db_error": db_error,
+    }
+
+
 def get_active_access_for_ip(client_ip: str):
     if not client_ip:
         return None
@@ -1781,6 +1877,7 @@ def build_kirvano_public_result(result: dict) -> dict:
         "ok": ok,
         "test_status": result.get("test_status"),
         "token_from_cache": bool(result.get("token_from_cache")),
+        "storage": result.get("storage", "supabase"),
         "access": {
             "username": username,
             "password": password,
@@ -1800,8 +1897,38 @@ def process_kirvano_webhook(payload: dict) -> dict:
     checkout_id = str(payload.get("checkout_id") or "").strip()
     webhook_key = make_kirvano_webhook_key(payload)
     customer = extract_kirvano_customer(payload)
+    should_release_access = event in KIRVANO_ACCESS_EVENTS and status in KIRVANO_APPROVED_STATUSES
 
-    conn, _ = open_db_from_env()
+    try:
+        conn, _ = open_db_from_env()
+    except Exception:
+        if not should_release_access:
+            return {
+                "ok": True,
+                "action": "ignored",
+                "reason": "Evento sem liberacao de acesso.",
+                "event": event,
+                "status": status,
+                "storage": "memory",
+                "db_available": False,
+            }
+
+        lead_key = sale_id or checkout_id or webhook_key
+        result = generate_access_once(
+            client_ip=f"kirvano:{lead_key}",
+            telefone=customer["phone"],
+            telegram_id=customer["telegram_id"],
+        )
+        public_result = build_kirvano_public_result(result)
+        return {
+            **public_result,
+            "webhook_key": webhook_key,
+            "event": event,
+            "sale_id": sale_id,
+            "checkout_id": checkout_id,
+            "db_available": False,
+        }
+
     try:
         with conn.cursor() as cur:
             cur.execute("select pg_advisory_lock(hashtext(%s));", (webhook_key,))
@@ -1855,7 +1982,7 @@ def process_kirvano_webhook(payload: dict) -> dict:
                     },
                 }
 
-            if event not in KIRVANO_ACCESS_EVENTS or status not in KIRVANO_APPROVED_STATUSES:
+            if not should_release_access:
                 ignored_result = {
                     "ok": True,
                     "action": "ignored",
@@ -1929,7 +2056,16 @@ def process_kirvano_webhook(payload: dict) -> dict:
 
 
 def generate_access_once(client_ip: str = None, telefone: str = "", telegram_id: str = ""):
-    conn, cfg = open_db_from_env()
+    try:
+        conn, cfg = open_db_from_env()
+    except Exception as exc:
+        return generate_access_without_db(
+            client_ip=client_ip,
+            telefone=telefone,
+            telegram_id=telegram_id,
+            db_error=str(exc),
+        )
+
     try:
         token_info = get_or_refresh_shared_token(conn, cfg, client_ip=client_ip, force_refresh=False)
         if not token_info.get("ok"):
