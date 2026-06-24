@@ -1,6 +1,9 @@
 import os
 import hmac
-from datetime import datetime
+import hashlib
+import json
+import sqlite3
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from flask import Flask, redirect, render_template, request, url_for
 from automate_mcapi import (
@@ -18,6 +21,12 @@ from automate_mcapi import (
 )
 
 app = Flask(__name__)
+ANALYTICS_DB_PATH = os.getenv("ANALYTICS_DB_PATH", os.path.join(os.path.dirname(__file__), "analytics.sqlite3"))
+ANALYTICS_ORIGINS = {
+    "https://fabiodkk.github.io",
+    "https://wplay-teste-4h.onrender.com",
+    "http://localhost:5000",
+}
 
 
 def default_limit_info(reason=""):
@@ -50,6 +59,64 @@ def safe_to_brasilia(iso_date: str) -> str:
         return to_brasilia(iso_date)
     except Exception:
         return iso_date or ""
+
+
+def analytics_cors_response(payload=None, status=200):
+    response = app.response_class(
+        response=json.dumps(payload or {}, ensure_ascii=False),
+        status=status,
+        mimetype="application/json",
+    )
+    origin = request.headers.get("Origin", "")
+    response.headers["Access-Control-Allow-Origin"] = origin if origin in ANALYTICS_ORIGINS else "https://fabiodkk.github.io"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+    response.headers["Vary"] = "Origin"
+    return response
+
+
+def analytics_db():
+    conn = sqlite3.connect(ANALYTICS_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute(
+        """
+        create table if not exists page_views (
+          id integer primary key autoincrement,
+          created_at text not null,
+          page text not null,
+          url text,
+          referrer text,
+          visitor_id text,
+          session_id text,
+          ip_hash text,
+          user_agent text
+        )
+        """
+    )
+    conn.execute("create index if not exists idx_page_views_page_created on page_views (page, created_at)")
+    conn.execute("create index if not exists idx_page_views_visitor on page_views (visitor_id)")
+    conn.commit()
+    return conn
+
+
+def parse_analytics_payload(req):
+    payload = req.get_json(silent=True)
+    if isinstance(payload, dict):
+        return payload
+    raw = req.get_data(as_text=True) or ""
+    if raw:
+        try:
+            parsed = json.loads(raw)
+            return parsed if isinstance(parsed, dict) else {}
+        except Exception:
+            return {}
+    return {}
+
+
+def ip_hash_for_request(req):
+    ip = get_client_ip(req)
+    salt = os.getenv("ANALYTICS_IP_SALT", "wplay-obrigado")
+    return hashlib.sha256(f"{salt}:{ip}".encode("utf-8")).hexdigest()[:24]
 
 
 def get_client_ip(req) -> str:
@@ -214,6 +281,190 @@ def liberado_webhook():
     if not result.get("ok") and result.get("event") in {"SALE_APPROVED", "SUBSCRIPTION_RENEWED"}:
         status_code = 500
     return result, status_code
+
+
+@app.route("/api/obrigado-view", methods=["POST", "OPTIONS"])
+def api_obrigado_view():
+    if request.method == "OPTIONS":
+        return analytics_cors_response({"ok": True})
+
+    payload = parse_analytics_payload(request)
+    page = str(payload.get("page") or "/obrigado").strip()[:120] or "/obrigado"
+    url = str(payload.get("url") or "").strip()[:800]
+    referrer = str(payload.get("referrer") or "").strip()[:800]
+    visitor_id = str(payload.get("visitor_id") or "").strip()[:120]
+    session_id = str(payload.get("session_id") or "").strip()[:120]
+    user_agent = (request.headers.get("User-Agent") or "").strip()[:500]
+
+    try:
+        conn = analytics_db()
+        try:
+            conn.execute(
+                """
+                insert into page_views (
+                  created_at, page, url, referrer, visitor_id, session_id, ip_hash, user_agent
+                ) values (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    datetime.now(timezone.utc).isoformat(),
+                    page,
+                    url,
+                    referrer,
+                    visitor_id or None,
+                    session_id or None,
+                    ip_hash_for_request(request),
+                    user_agent,
+                ),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception:
+        app.logger.exception("Falha ao registrar visita da pagina obrigado")
+        return analytics_cors_response({"ok": False, "error": "Falha ao registrar visita."}, status=500)
+
+    return analytics_cors_response({"ok": True})
+
+
+@app.route("/api/obrigado-stats", methods=["GET", "OPTIONS"])
+def api_obrigado_stats():
+    if request.method == "OPTIONS":
+        return analytics_cors_response({"ok": True})
+
+    try:
+        days = int(request.args.get("days") or 30)
+    except ValueError:
+        days = 30
+    days = max(1, min(days, 180))
+    page = str(request.args.get("page") or "/obrigado").strip()[:120] or "/obrigado"
+
+    brt = ZoneInfo("America/Sao_Paulo")
+    now_brt = datetime.now(brt)
+    start_date = now_brt.date() - timedelta(days=days - 1)
+    start_brt = datetime.combine(start_date, datetime.min.time(), tzinfo=brt)
+    start_utc = start_brt.astimezone(timezone.utc).isoformat()
+
+    daily = {}
+    for index in range(days):
+        day = start_date + timedelta(days=index)
+        key = day.isoformat()
+        daily[key] = {
+            "date": key,
+            "label": day.strftime("%d/%m"),
+            "visits": 0,
+            "visitors": set(),
+        }
+
+    hourly = {
+        hour: {
+            "hour": hour,
+            "label": f"{hour:02d}:00",
+            "visits": 0,
+            "visitors": set(),
+        }
+        for hour in range(24)
+    }
+    total_visitors = set()
+    today_visits = 0
+    today_visitors = set()
+    recent = []
+
+    try:
+        conn = analytics_db()
+        try:
+            rows = conn.execute(
+                """
+                select created_at, page, url, referrer, visitor_id, ip_hash
+                from page_views
+                where page = ? and created_at >= ?
+                order by created_at asc
+                """,
+                (page, start_utc),
+            ).fetchall()
+            recent_rows = conn.execute(
+                """
+                select created_at, referrer, visitor_id, ip_hash
+                from page_views
+                where page = ?
+                order by created_at desc
+                limit 30
+                """,
+                (page,),
+            ).fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        app.logger.exception("Falha ao ler contador da pagina obrigado")
+        return analytics_cors_response({"ok": False, "error": "Falha ao ler contador."}, status=500)
+
+    for row in rows:
+        try:
+            created = datetime.fromisoformat(row["created_at"]).astimezone(brt)
+        except Exception:
+            continue
+        visitor_key = row["visitor_id"] or row["ip_hash"] or "sem-id"
+        day_key = created.date().isoformat()
+        if day_key in daily:
+            daily[day_key]["visits"] += 1
+            daily[day_key]["visitors"].add(visitor_key)
+        hourly[created.hour]["visits"] += 1
+        hourly[created.hour]["visitors"].add(visitor_key)
+        total_visitors.add(visitor_key)
+        if created.date() == now_brt.date():
+            today_visits += 1
+            today_visitors.add(visitor_key)
+
+    for row in recent_rows:
+        try:
+            created = datetime.fromisoformat(row["created_at"]).astimezone(brt)
+        except Exception:
+            continue
+        recent.append(
+            {
+                "date": created.strftime("%d/%m/%Y"),
+                "time": created.strftime("%H:%M:%S"),
+                "visitor": (row["visitor_id"] or row["ip_hash"] or "")[:10],
+                "referrer": row["referrer"] or "",
+            }
+        )
+
+    daily_list = []
+    for item in daily.values():
+        daily_list.append(
+            {
+                "date": item["date"],
+                "label": item["label"],
+                "visits": item["visits"],
+                "visitors": len(item["visitors"]),
+            }
+        )
+    hourly_list = [
+        {
+            "hour": item["hour"],
+            "label": item["label"],
+            "visits": item["visits"],
+            "visitors": len(item["visitors"]),
+        }
+        for item in hourly.values()
+    ]
+
+    return analytics_cors_response(
+        {
+            "ok": True,
+            "page": page,
+            "days": days,
+            "updated_at": now_brt.strftime("%d/%m/%Y %H:%M:%S"),
+            "totals": {
+                "visits": len(rows),
+                "visitors": len(total_visitors),
+                "today_visits": today_visits,
+                "today_visitors": len(today_visitors),
+            },
+            "daily": daily_list,
+            "hourly": hourly_list,
+            "recent": recent,
+        }
+    )
 
 
 @app.post("/")
