@@ -9,6 +9,7 @@ __pycache__/
 cloudflared.out.log
 cloudflared.err.log
 public_link.pids.json
+analytics.sqlite3*
 
 # local tools/cache
 .tools/
